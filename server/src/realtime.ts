@@ -2,14 +2,14 @@ import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, OfficeRequest, ServerToClientEvents } from '../../shared/types.js';
-import { listPendingRequests, markAnnounced } from './db.js';
+import { listUnannouncedRequests, markAnnounced } from './db.js';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 
 const RECEIVERS = 'receivers';
 let io: IO | null = null;
 
-function receiverOnline(): boolean {
+export function receiverOnline(): boolean {
   return (io?.sockets.adapter.rooms.get(RECEIVERS)?.size ?? 0) > 0;
 }
 
@@ -27,13 +27,14 @@ export function setupRealtime(httpServer: HttpServer | HttpsServer) {
     socket.on('receiver:join', (ack) => {
       socket.join(RECEIVERS);
       broadcastReceiverStatus();
-      if (typeof ack === 'function') ack(listPendingRequests());
+      if (typeof ack === 'function') ack(listUnannouncedRequests());
     });
 
     socket.on('request:announced', (update) => {
       const id = Number(update?.id);
       if (!Number.isInteger(id) || !socket.rooms.has(RECEIVERS)) return;
-      if (markAnnounced(id)) io!.emit('request:status', { id, status: 'announced' });
+      const updated = markAnnounced(id);
+      if (updated) broadcastUpdate(updated);
     });
 
     socket.on('disconnect', () => {
@@ -43,13 +44,19 @@ export function setupRealtime(httpServer: HttpServer | HttpsServer) {
   });
 }
 
-/** Pushes a newly saved request to every open receiver page. */
-export function deliverRequest(request: OfficeRequest) {
-  io?.to(RECEIVERS).emit('request:new', request);
+/**
+ * A newly saved request goes to every client: receivers announce it, dashboards add it
+ * to the queue. (Everyone on the office network can see the dashboard anyway.)
+ */
+export function broadcastNew(request: OfficeRequest) {
+  io?.emit('request:new', request);
+}
+
+/** Any change to an existing request. Receivers never announce these. */
+export function broadcastUpdate(request: OfficeRequest) {
+  io?.emit('request:updated', request);
 }
 
 export function closeRealtime() {
   io?.close();
 }
-
-export { receiverOnline };

@@ -10,7 +10,7 @@ import {
   getOrCreateUser,
   getUser,
   listPresets,
-  renameUser,
+  updateUser,
   updatePreset,
 } from '../db.js';
 
@@ -42,17 +42,25 @@ function requireUser(req: Request): number {
   return userId;
 }
 
-// Sign in: find or create the user by name.
+// Sign in: find or create the user by name. `isStaff: true` turns staff mode on.
 usersRouter.post('/', (req, res) => {
   const name = readName(req.body?.name, 'Name');
-  res.json(getOrCreateUser(name, nameKey(name)));
+  res.json(getOrCreateUser(name, nameKey(name), req.body?.isStaff === true));
 });
 
-// Change display name, keeping presets.
+// Change display name (keeps presets) and/or staff mode.
 usersRouter.patch('/:userId', (req, res) => {
   const userId = requireUser(req);
-  const name = readName(req.body?.name, 'Name');
-  res.json(renameUser(userId, name, nameKey(name)));
+  const changes: { name?: string; key?: string; isStaff?: boolean } = {};
+  if (req.body?.name !== undefined) {
+    changes.name = readName(req.body.name, 'Name');
+    changes.key = nameKey(changes.name);
+  }
+  if (req.body?.isStaff !== undefined) {
+    if (typeof req.body.isStaff !== 'boolean') throw new UserError('isStaff must be true or false.');
+    changes.isStaff = req.body.isStaff;
+  }
+  res.json(updateUser(userId, changes));
 });
 
 usersRouter.get('/:userId/presets', (req, res) => {

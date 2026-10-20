@@ -72,6 +72,17 @@ office-call/
 - After a rename, other devices still remember the old name. Signing in there with the
   old name creates a new, empty user. Sign in with the new name instead.
 
+### Staff mode
+
+- Ticking **I am staff** when signing in turns staff mode on for that name, stored as
+  `users.is_staff`. Signing in later without ticking it does **not** turn it off. Turn it
+  off with the checkbox on the name screen (click your name in the header).
+- Only staff can change request status. The **server** checks this
+  (`PATCH /api/requests/:id/status` returns `403` for non-staff), not only the UI.
+- **This is not real security.** Anyone can tick the box or type a staff member's name. It
+  only stops mistakes. Real protection would need a staff PIN or password checked by the
+  server.
+
 ## Database schema (SQLite)
 
 Item definitions (drinks, snacks, options) live in a config file (`shared/catalog.ts`),
@@ -83,7 +94,8 @@ CREATE TABLE users (
   id         INTEGER PRIMARY KEY,
   name       TEXT NOT NULL,              -- display name as typed
   name_key   TEXT NOT NULL UNIQUE,       -- normalised, used for lookup
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  is_staff   INTEGER NOT NULL DEFAULT 0, -- may change request status
+  created_at TEXT NOT NULL
 );
 
 CREATE TABLE presets (
@@ -91,8 +103,8 @@ CREATE TABLE presets (
   user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name       TEXT NOT NULL,
   selection  TEXT NOT NULL,              -- JSON, see "Selection" below
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
   UNIQUE (user_id, name)
 );
 
@@ -100,15 +112,28 @@ CREATE TABLE requests (
   id                INTEGER PRIMARY KEY,
   client_request_id TEXT NOT NULL UNIQUE,  -- stops duplicate submissions
   user_id           INTEGER NOT NULL REFERENCES users(id),
+  user_name         TEXT NOT NULL,         -- requester's name at the time of the request
   type              TEXT NOT NULL CHECK (type IN ('order', 'call')),
   selection         TEXT,                  -- JSON, NULL for 'call'
-  status            TEXT NOT NULL DEFAULT 'received'
-                    CHECK (status IN ('received', 'announced')),
-  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
-  announced_at      TEXT
+  search_text       TEXT NOT NULL,         -- lowercase name + summary, for history search
+  status            TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'in_progress', 'done')),
+  created_at        TEXT NOT NULL,
+  updated_at        TEXT NOT NULL,         -- any change (status or announced)
+  announced_at      TEXT,                  -- NULL until the receiver has spoken it
+  completed_at      TEXT,                  -- set when status becomes 'done'
+  completed_by      TEXT                   -- staff display name
 );
-CREATE INDEX idx_requests_created ON requests(created_at);
+CREATE INDEX idx_requests_status_created ON requests(status, created_at);
+CREATE INDEX idx_requests_completed ON requests(completed_at);
 ```
+
+All times are ISO-8601 UTC strings. Done requests are never deleted, so History is
+just `status = 'done'`.
+
+**Upgrades:** `PRAGMA user_version` holds the schema version (now 2). On start, an older
+database is upgraded once, inside a transaction. Requests made before version 2 become
+`done`, so they appear in History and not in the queue.
 
 ### Selection (JSON stored in `presets.selection` and `requests.selection`)
 
@@ -127,30 +152,33 @@ Item IDs point into the config. Unknown IDs are rejected by the server.
 
 ## API
 
-| Method | Path                           | Purpose                                    |
-| ------ | ------------------------------ | ------------------------------------------ |
-| GET    | /api/health                    | Server alive check                         |
-| GET    | /api/items                     | Drinks, snacks and their options           |
-| POST   | /api/users                     | Sign in: get-or-create user by name        |
-| PATCH  | /api/users/:userId             | Change display name (keeps presets)        |
-| GET    | /api/users/:userId/presets     | List this user's presets                   |
-| POST   | /api/users/:userId/presets     | Create preset                              |
-| PUT    | /api/users/:userId/presets/:id | Edit preset (only if it belongs to user)   |
-| DELETE | /api/users/:userId/presets/:id | Delete preset (only if it belongs to user) |
-| POST   | /api/requests                  | Create order or call; returns saved row    |
-| GET    | /api/requests/recent           | Recent history (receiver page)             |
+| Method | Path                           | Purpose                                                       |
+| ------ | ------------------------------ | ------------------------------------------------------------- |
+| GET    | /api/health                    | Server alive check                                            |
+| GET    | /api/items                     | Drinks, snacks and their options                              |
+| POST   | /api/users                     | Sign in by name; `isStaff: true` = staff                      |
+| PATCH  | /api/users/:userId             | Change name and/or `isStaff`                                  |
+| GET    | /api/users/:userId/presets     | List this user's presets                                      |
+| POST   | /api/users/:userId/presets     | Create preset                                                 |
+| PUT    | /api/users/:userId/presets/:id | Edit preset (only if it belongs to user)                      |
+| DELETE | /api/users/:userId/presets/:id | Delete preset (only if it belongs to user)                    |
+| POST   | /api/requests                  | Create order or call; returns saved row                       |
+| GET    | /api/requests/recent           | Recent requests (receiver page)                               |
+| GET    | /api/requests/active?since=    | Pending + in progress, oldest first; done count since `since` |
+| GET    | /api/requests/history?q=       | Done, newest first; search name/content; `limit`, `offset`    |
+| PATCH  | /api/requests/:id/status       | Staff only. Body `{ userId, status }`                         |
 
 Errors always come back as `{ "ok": false, "error": "<message for the user>" }`.
 
 ## Socket.IO events
 
-| Event               | Direction            | Payload                                        | Meaning                                             |
-| ------------------- | -------------------- | ---------------------------------------------- | --------------------------------------------------- |
-| `receiver:join`     | receiver → server    | — (ack returns pending requests)               | Receiver registers; gets anything not yet announced |
-| `request:new`       | server → receivers   | `{ id, userName, type, selection, createdAt }` | New request to announce                             |
-| `request:announced` | receiver → server    | `{ id }`                                       | Receiver finished speaking it                       |
-| `request:status`    | server → all clients | `{ id, status }`                               | Requester sees "announced"                          |
-| `receiver:status`   | server → all clients | `{ online: boolean }`                          | Shows if the speaker is listening                   |
+| Event               | Direction            | Payload                          | Meaning                                             |
+| ------------------- | -------------------- | -------------------------------- | --------------------------------------------------- |
+| `receiver:join`     | receiver → server    | — (ack returns pending requests) | Receiver registers; gets anything not yet announced |
+| `request:new`       | server → all clients | full request                     | Receiver announces it; dashboards add it            |
+| `request:announced` | receiver → server    | `{ id }`                         | Receiver finished speaking it                       |
+| `request:updated`   | server → all clients | full request                     | Announced or status changed. **Never announced.**   |
+| `receiver:status`   | server → all clients | `{ online: boolean }`            | Shows if the speaker is listening                   |
 
 Socket.IO reconnects by itself after network drops. On reconnect the receiver sends
 `receiver:join` again and picks up any requests it missed.
@@ -168,6 +196,18 @@ Socket.IO reconnects by itself after network drops. On reconnect the receiver se
 - When a receiver joins, it gets requests not yet announced from the **last 30 minutes**.
   Older ones are too stale to announce, but still appear in history.
 - Open **one** receiver tab only. Every receiver tab announces every request.
+
+### Dashboard rules (`/dashboard`)
+
+- Status moves forward only: `pending → in_progress → done`. `pending → done` is also
+  allowed. `done` is final.
+- Concurrent clicks are safe: the read and the write happen in one transaction, and the
+  write only applies `WHERE status = <the status just read>`. The second click gets
+  `409 This request is already done by Karim.`
+- Dashboards apply `request:new` / `request:updated` directly and reload after a
+  reconnect. "Completed today" counts from the viewer's local midnight.
+- If staff marks a request done before the receiver has spoken it, the receiver drops it
+  from its queue ("Done before announced").
 
 ## Announcements
 

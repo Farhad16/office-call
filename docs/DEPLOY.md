@@ -149,5 +149,7 @@ data needs extra setup, which this project doesn't include:
 - Identity is **name only**. Anyone can type any name and use that person's presets. This
   is fine for an internal office tool. Don't store anything private.
 - Two people with the same name share one identity. Use nicknames or initials.
+- **Staff mode is a checkbox, not a login.** Anyone can tick "I am staff". The server
+  only lets staff change status, but it can't prove who is staff.
 - One receiver, on the office PC. Requests sent while it is off are announced when it
   starts, if they are less than 30 minutes old. Older ones only appear in history.

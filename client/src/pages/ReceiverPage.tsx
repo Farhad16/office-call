@@ -16,7 +16,7 @@ import {
 import { readStored, writeStored } from '../lib/storage';
 import styles from './ReceiverPage.module.css';
 
-type ItemState = 'waiting' | 'queued' | 'speaking' | 'announced' | 'failed';
+type ItemState = 'waiting' | 'queued' | 'speaking' | 'announced' | 'skipped' | 'failed';
 type HistoryItem = { request: OfficeRequest; state: ItemState; error?: string };
 
 type Settings = { language: VoicePreference; voiceURI: string; rate: number; repeat: boolean; chime: boolean };
@@ -35,6 +35,7 @@ const STATE_LABEL: Record<ItemState, string> = {
   queued: 'In queue',
   speaking: 'Speaking…',
   announced: 'Announced',
+  skipped: 'Done before announced',
   failed: 'Failed',
 };
 
@@ -164,9 +165,7 @@ export function ReceiverPage() {
     queue.current = new AnnouncementQueue(announce);
     try {
       const recent = await getJson<OfficeRequest[]>('/api/requests/recent?limit=30');
-      setHistory(
-        recent.map((request) => ({ request, state: request.status === 'announced' ? 'announced' : 'waiting' })),
-      );
+      setHistory(recent.map((request) => ({ request, state: request.announced ? 'announced' : 'waiting' })));
     } catch (err) {
       setError(`Could not load history: ${errorMessage(err)}`);
     }
@@ -192,12 +191,19 @@ export function ReceiverPage() {
     if (!started) return;
     const join = () => socket.emit('receiver:join', (pending) => pending.forEach(enqueue));
     const onNew = (request: OfficeRequest) => enqueue(request);
+    // Status changes are never announced. If staff finished a request before it was
+    // spoken, take it out of the queue.
+    const onUpdated = (request: OfficeRequest) => {
+      if (request.status === 'done' && queue.current?.remove(request.id)) upsert(request, { state: 'skipped' });
+    };
     socket.on('connect', join);
     socket.on('request:new', onNew);
+    socket.on('request:updated', onUpdated);
     if (socket.connected) join();
     return () => {
       socket.off('connect', join);
       socket.off('request:new', onNew);
+      socket.off('request:updated', onUpdated);
     };
     // enqueue only touches refs and state setters, so it is safe to leave out.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -224,13 +230,18 @@ export function ReceiverPage() {
   }, [started]);
 
   function test(type: 'order' | 'call') {
+    const now = new Date().toISOString();
     enqueue({
       id: --testId,
       userName: 'Farhad',
       type,
       selection: type === 'order' ? SAMPLE_ORDER : null,
-      status: 'received',
-      createdAt: new Date().toISOString(),
+      status: 'pending',
+      announced: false,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+      completedBy: null,
     });
   }
 

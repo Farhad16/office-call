@@ -4,14 +4,16 @@ import styles from './NameEntry.module.css';
 
 type Props = {
   initialName?: string;
+  initialStaff?: boolean;
   /** Resolves to an error message to show, or null on success. */
-  onSubmit: (name: string) => Promise<string | null>;
+  onSubmit: (name: string, isStaff: boolean) => Promise<string | null>;
   onCancel?: () => void;
   onSwitchUser?: () => void;
 };
 
-export function NameEntry({ initialName = '', onSubmit, onCancel, onSwitchUser }: Props) {
+export function NameEntry({ initialName = '', initialStaff = false, onSubmit, onCancel, onSwitchUser }: Props) {
   const [value, setValue] = useState(initialName);
+  const [staff, setStaff] = useState(initialStaff);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const renaming = initialName !== '';
@@ -26,7 +28,7 @@ export function NameEntry({ initialName = '', onSubmit, onCancel, onSwitchUser }
       return;
     }
     setBusy(true);
-    const serverError = await onSubmit(name);
+    const serverError = await onSubmit(name, staff);
     setBusy(false);
     if (serverError) setError(serverError);
   }
@@ -63,6 +65,13 @@ export function NameEntry({ initialName = '', onSubmit, onCancel, onSwitchUser }
             : 'This name is spoken on the office speaker. No password needed.'}
         </p>
       )}
+      <label className={styles.staff}>
+        <input type="checkbox" checked={staff} onChange={(e) => setStaff(e.target.checked)} />
+        <span>
+          I am staff
+          <small>Staff can update request status on the dashboard.</small>
+        </span>
+      </label>
       <div className={styles.actions}>
         {onCancel && (
           <button type="button" className={styles.secondary} onClick={onCancel} disabled={busy}>

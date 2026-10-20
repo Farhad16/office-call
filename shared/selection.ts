@@ -144,3 +144,38 @@ export function sameSelection(a: Selection, b: Selection): boolean {
   const norm = (s: Selection) => JSON.stringify({ drinks: s.drinks, snacks: s.snacks, custom: cleanText(s.custom) });
   return norm(a) === norm(b);
 }
+
+export type DescribedItem = { label: string; qty: number; details: string[] };
+
+/**
+ * Item-by-item description for request cards, e.g.
+ * [{ label: 'Tea', qty: 1, details: ['Less sugar', 'Ginger and lemon'] }, { label: 'Chanachur Makha', qty: 1 }]
+ */
+export function describeSelection(sel: Selection, catalog: Catalog): { items: DescribedItem[]; custom: string } {
+  const items: DescribedItem[] = [];
+  for (const line of sel.drinks) {
+    const item = findItem(catalog.drinks, line.itemId);
+    if (!item) continue;
+    const details: string[] = [];
+    const toggles: string[] = [];
+    for (const option of itemOptions(item, catalog)) {
+      const v = line.options[option.id];
+      if (option.kind === 'choice') {
+        const choice = option.choices.find((c) => c.id === v);
+        if (choice) details.push(choice.label);
+      } else if (v === true) {
+        toggles.push(option.label.toLowerCase());
+      }
+    }
+    if (toggles.length) {
+      const text = toggles.length === 1 ? toggles[0] : `${toggles.slice(0, -1).join(', ')} and ${toggles.at(-1)}`;
+      details.push(text[0].toUpperCase() + text.slice(1));
+    }
+    items.push({ label: item.label, qty: line.qty, details });
+  }
+  for (const line of sel.snacks) {
+    const item = findItem(catalog.snacks, line.itemId);
+    if (item) items.push({ label: item.label, qty: line.qty, details: [] });
+  }
+  return { items, custom: cleanText(sel.custom) };
+}

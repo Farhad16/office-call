@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import type { User } from '../../shared/types.js';
 import { NameEntry } from './components/NameEntry';
 import { OrderPage } from './pages/OrderPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { useRoute } from './lib/route';
 import { clearName, loadName, saveName } from './lib/identity';
 import { errorMessage, patchJson, postJson } from './lib/api';
 import styles from './App.module.css';
@@ -12,8 +14,8 @@ type Session =
   | { status: 'error'; name: string; error: string }
   | { status: 'ready'; user: User };
 
-async function fetchUser(name: string): Promise<User> {
-  const user = await postJson<User>('/api/users', { name });
+async function fetchUser(name: string, isStaff = false): Promise<User> {
+  const user = await postJson<User>('/api/users', { name, isStaff });
   saveName(user.name);
   return user;
 }
@@ -26,11 +28,12 @@ function initialSession(): Session {
 export default function App() {
   const [session, setSession] = useState<Session>(initialSession);
   const [editingName, setEditingName] = useState(false);
+  const [route, navigate] = useRoute();
 
   /** Finds or creates the user on the server. Returns an error message or null. */
-  async function signIn(name: string): Promise<string | null> {
+  async function signIn(name: string, isStaff: boolean): Promise<string | null> {
     try {
-      const user = await fetchUser(name);
+      const user = await fetchUser(name, isStaff);
       setSession({ status: 'ready', user });
       return null;
     } catch (err) {
@@ -94,9 +97,10 @@ export default function App() {
       <main className={styles.page}>
         <NameEntry
           initialName={user.name}
-          onSubmit={async (name) => {
+          initialStaff={user.isStaff}
+          onSubmit={async (name, isStaff) => {
             try {
-              const updated = await patchJson<User>(`/api/users/${user.id}`, { name });
+              const updated = await patchJson<User>(`/api/users/${user.id}`, { name, isStaff });
               saveName(updated.name);
               setSession({ status: 'ready', user: updated });
               setEditingName(false);
@@ -117,11 +121,31 @@ export default function App() {
       <header className={styles.header}>
         <span className={styles.brand}>☕ Office Call</span>
         <button className={styles.nameButton} onClick={() => setEditingName(true)} title="Change name">
-          {user.name} ✎
+          {user.name}
+          {user.isStaff && <span className={styles.staffBadge}>Staff</span>} ✎
         </button>
       </header>
-      {/* key: a different user gets a fresh page (their own presets) */}
-      <OrderPage key={user.id} user={user} />
+      <nav className={styles.tabs} aria-label="Pages">
+        {(['order', 'dashboard'] as const).map((r) => (
+          <a
+            key={r}
+            href={r === 'order' ? '/' : '/dashboard'}
+            aria-current={route === r ? 'page' : undefined}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate(r);
+            }}
+          >
+            {r === 'order' ? 'Order' : 'Dashboard'}
+          </a>
+        ))}
+      </nav>
+      {/* The order page stays mounted (hidden) so a half-finished selection survives switching tabs.
+          key: a different user gets a fresh page (their own presets). */}
+      <div hidden={route !== 'order'}>
+        <OrderPage key={user.id} user={user} />
+      </div>
+      {route === 'dashboard' && <DashboardPage user={user} />}
     </main>
   );
 }

@@ -40,14 +40,14 @@ export function OrderPage({ user }: { user: User }) {
   // When the receiver finishes speaking our last request, say so.
   useEffect(() => {
     if (lastSentId === null) return;
-    const onStatus = ({ id, status }: { id: number; status: string }) => {
-      if (id === lastSentId && status === 'announced') {
+    const onUpdated = (request: OfficeRequest) => {
+      if (request.id === lastSentId && request.announced) {
         setNotice({ kind: 'success', text: 'Announced on the office speaker ✓' });
       }
     };
-    socket.on('request:status', onStatus);
+    socket.on('request:updated', onUpdated);
     return () => {
-      socket.off('request:status', onStatus);
+      socket.off('request:updated', onUpdated);
     };
   }, [lastSentId]);
 
@@ -80,7 +80,7 @@ export function OrderPage({ user }: { user: User }) {
       setCooldown(type);
       const what = type === 'call' ? 'Call sent' : 'Request sent';
       setNotice(
-        res.request.status === 'announced'
+        res.request.announced
           ? { kind: 'success', text: 'Announced on the office speaker ✓' }
           : res.receiverOnline
             ? { kind: 'success', text: `${what} ✓ Waiting for the speaker…` }

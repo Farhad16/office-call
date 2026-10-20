@@ -15,6 +15,8 @@ npm start                          # prints the addresses for phones
 
 - App: `http://<office-pc-ip>:3000`. Find the IP with `hostname -I`.
 - Receiver (speaker): `http://localhost:3000/receiver` in Chrome on the office PC.
+- Dashboard: the **Dashboard** tab (`/dashboard`) shows the live queue and history.
+  Tick **I am staff** when signing in to change request status.
 
 For start-at-boot, HTTPS and installing the app on phones, follow [docs/DEPLOY.md](docs/DEPLOY.md).
 

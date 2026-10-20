@@ -48,7 +48,8 @@ export type Selection = {
   custom: string;
 };
 
-export type User = { id: number; name: string };
+/** isStaff: may change request statuses. Name-based, so NOT real security (see docs). */
+export type User = { id: number; name: string; isStaff: boolean };
 
 export type Preset = {
   id: number;
@@ -61,17 +62,34 @@ export type Preset = {
 export type ApiErrorBody = { ok: false; error: string };
 
 export type RequestType = 'order' | 'call';
-export type RequestStatus = 'received' | 'announced';
+/** Work status, changed by staff: pending → in_progress → done. */
+export type RequestStatus = 'pending' | 'in_progress' | 'done';
 
-/** A saved request, as sent to the receiver and the requester. */
+/** Allowed status changes. `done` is final. */
+export const NEXT_STATUSES: Record<RequestStatus, RequestStatus[]> = {
+  pending: ['in_progress', 'done'],
+  in_progress: ['done'],
+  done: [],
+};
+
+/** A saved request, as sent to the receiver, the requester and the dashboard. */
 export type OfficeRequest = {
   id: number;
-  userName: string;
+  userName: string; // requester's name at the time of the request
   type: RequestType;
   selection: Selection | null; // null for 'call'
   status: RequestStatus;
+  announced: boolean; // spoken by the receiver
   createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  completedBy: string | null; // staff display name
 };
+
+/** GET /api/requests/active */
+export type ActiveResponse = { requests: OfficeRequest[]; completedToday: number };
+/** GET /api/requests/history */
+export type HistoryResponse = { requests: OfficeRequest[]; hasMore: boolean };
 
 /** Body of POST /api/requests. */
 export type CreateRequestBody = {
@@ -84,7 +102,8 @@ export type CreateRequestBody = {
 // Socket.IO events (see docs/ARCHITECTURE.md).
 export interface ServerToClientEvents {
   'request:new': (request: OfficeRequest) => void;
-  'request:status': (update: { id: number; status: RequestStatus }) => void;
+  /** Sent after any change: announced, or a status change by staff. Never re-announced. */
+  'request:updated': (request: OfficeRequest) => void;
   'receiver:status': (status: { online: boolean }) => void;
 }
 

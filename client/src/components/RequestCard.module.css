@@ -1,0 +1,113 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.card[data-status='pending'] {
+  border-left-color: #d9962b;
+}
+.card[data-status='in_progress'] {
+  border-left-color: var(--accent);
+}
+.card[data-status='done'] {
+  border-left-color: var(--success);
+}
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.time {
+  color: var(--muted);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.badge {
+  flex: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.badge[data-status='pending'] {
+  background: color-mix(in srgb, #d9962b 18%, var(--bg));
+  color: #9a6110;
+}
+.badge[data-status='in_progress'] {
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg));
+  color: var(--accent);
+}
+.badge[data-status='done'] {
+  background: color-mix(in srgb, var(--success) 18%, var(--bg));
+  color: var(--success);
+}
+@media (prefers-color-scheme: dark) {
+  .badge[data-status='pending'] {
+    color: #f0b860;
+  }
+}
+.items {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.items li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+}
+.detail {
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.detail::before {
+  content: '· ';
+}
+.custom {
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+.call {
+  margin: 8px 0 0;
+  font-weight: 600;
+}
+.meta {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  justify-content: flex-end;
+}
+.actions button {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+.actions button[data-primary] {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+}
+.actions button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}

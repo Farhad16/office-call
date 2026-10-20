@@ -18,6 +18,13 @@ export class AnnouncementQueue<T extends { id: number }> {
     return true;
   }
 
+  /** Drops an item that has not started yet. Returns true if it was waiting. */
+  remove(id: number): boolean {
+    const before = this.items.length;
+    this.items = this.items.filter((item) => item.id !== id);
+    return this.items.length < before;
+  }
+
   has(id: number): boolean {
     return this.seen.has(id);
   }
