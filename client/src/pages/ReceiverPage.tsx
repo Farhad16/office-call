@@ -4,16 +4,30 @@ import { buildAnnouncement, type AnnounceLanguage } from '../../../shared/announ
 import { errorMessage, getJson } from '../lib/api';
 import { socket } from '../lib/socket';
 import { AnnouncementQueue } from '../lib/announcementQueue';
-import { isBengali, loadVoices, pickDefaultVoice, playChime, speak, speechSupported } from '../lib/speech';
+import {
+  isBengali,
+  loadVoices,
+  pickVoice,
+  playChime,
+  speak,
+  speechSupported,
+  type VoicePreference,
+} from '../lib/speech';
 import { readStored, writeStored } from '../lib/storage';
 import styles from './ReceiverPage.module.css';
 
 type ItemState = 'waiting' | 'queued' | 'speaking' | 'announced' | 'failed';
 type HistoryItem = { request: OfficeRequest; state: ItemState; error?: string };
 
-type Settings = { voiceURI: string; rate: number; repeat: boolean; chime: boolean };
+type Settings = { language: VoicePreference; voiceURI: string; rate: number; repeat: boolean; chime: boolean };
 const SETTINGS_KEY = 'officeCall.receiverSettings';
-const DEFAULT_SETTINGS: Settings = { voiceURI: '', rate: 0.95, repeat: false, chime: true };
+const DEFAULT_SETTINGS: Settings = { language: 'auto', voiceURI: '', rate: 0.95, repeat: false, chime: true };
+
+const LANGUAGES: { id: VoicePreference; label: string }[] = [
+  { id: 'auto', label: 'Auto' },
+  { id: 'bn', label: 'বাংলা' },
+  { id: 'en', label: 'English' },
+];
 const HISTORY_LIMIT = 50;
 
 const STATE_LABEL: Record<ItemState, string> = {
@@ -46,8 +60,11 @@ export function ReceiverPage() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const voice = voices?.find((v) => v.voiceURI === settings.voiceURI) ?? pickDefaultVoice(voices ?? []);
-  const lang: AnnounceLanguage = isBengali(voice) ? 'bn' : 'en';
+  // A voice picked by hand wins; otherwise the best voice for the chosen language.
+  const autoVoice = pickVoice(voices ?? [], settings.language);
+  const voice = voices?.find((v) => v.voiceURI === settings.voiceURI) ?? autoVoice;
+  // Auto: speak Bengali text only when the voice can speak Bengali.
+  const lang: AnnounceLanguage = settings.language === 'auto' ? (isBengali(voice) ? 'bn' : 'en') : settings.language;
   const hasBengali = !!voices?.some((v) => isBengali(v));
 
   // The queue runs outside React renders, so it reads the latest values from this ref.
@@ -194,6 +211,24 @@ export function ReceiverPage() {
   const queued = history.filter((h) => h.state === 'queued').length;
   const sortedVoices = [...(voices ?? [])].sort((a, b) => Number(isBengali(b)) - Number(isBengali(a)));
 
+  const languagePicker = (
+    <fieldset className={styles.language}>
+      <legend>Announcement language</legend>
+      {LANGUAGES.map((l) => (
+        <label key={l.id} className={styles.langChip}>
+          <input
+            type="radio"
+            name="language"
+            checked={settings.language === l.id}
+            // Changing language goes back to the automatic voice for that language.
+            onChange={() => setSettings({ ...settings, language: l.id, voiceURI: '' })}
+          />
+          <span>{l.label}</span>
+        </label>
+      ))}
+    </fieldset>
+  );
+
   const voiceInfo = !speechSupported ? (
     <p className={styles.bad}>This browser cannot speak. Use Google Chrome.</p>
   ) : voices === null ? (
@@ -202,13 +237,15 @@ export function ReceiverPage() {
     <p className={styles.bad}>
       No voices installed. On Linux run <code>sudo apt install speech-dispatcher espeak-ng</code> and restart Chrome.
     </p>
-  ) : hasBengali ? (
-    <p className={styles.good}>
-      Bengali voice found: {voice?.name} ({voice?.lang})
+  ) : lang === 'bn' && !isBengali(voice) ? (
+    <p className={styles.bad}>
+      বাংলা is selected, but “{voice?.name}” cannot speak Bengali. Install a Bengali voice (README → Voice) or choose
+      English.
     </p>
   ) : (
-    <p className={styles.warn}>
-      No Bengali voice found. Announcing in English with “{voice?.name}”. See README → Voice to add Bengali.
+    <p className={lang === 'en' && settings.language === 'auto' && !hasBengali ? styles.warn : styles.good}>
+      Speaking {lang === 'bn' ? 'বাংলা' : 'English'} with “{voice?.name}” ({voice?.lang})
+      {lang === 'en' && settings.language === 'auto' && !hasBengali && ': no Bengali voice found. See README → Voice.'}
     </p>
   );
 
@@ -231,6 +268,7 @@ export function ReceiverPage() {
         <section className={styles.card}>
           <h2>Start the receiver</h2>
           <p>Keep this page open on the office computer, with the speaker on. Click once to turn on sound.</p>
+          {languagePicker}
           {voiceInfo}
           <button className={styles.start} onClick={start} disabled={!catalog}>
             🔊 Start receiver
@@ -251,6 +289,7 @@ export function ReceiverPage() {
           </section>
 
           <section className={styles.card}>
+            {languagePicker}
             {voiceInfo}
             <div className={styles.controls}>
               <button onClick={() => test('order')}>Test order</button>
@@ -264,7 +303,7 @@ export function ReceiverPage() {
                   value={settings.voiceURI}
                   onChange={(e) => setSettings({ ...settings, voiceURI: e.target.value })}
                 >
-                  <option value="">Automatic ({pickDefaultVoice(voices ?? [])?.name ?? 'none'})</option>
+                  <option value="">Automatic ({autoVoice?.name ?? 'none'})</option>
                   {sortedVoices.map((v) => (
                     <option key={v.voiceURI} value={v.voiceURI}>
                       {v.name} ({v.lang})
@@ -272,7 +311,7 @@ export function ReceiverPage() {
                   ))}
                 </select>
               </label>
-              <p className={styles.muted}>Bengali voices speak Bengali text. Any other voice speaks English text.</p>
+              <p className={styles.muted}>Pick a voice that matches the announcement language.</p>
               <label className={styles.field}>
                 Speed {settings.rate.toFixed(2)}
                 <input

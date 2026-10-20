@@ -37,10 +37,16 @@ last 30 minutes that were not announced yet get announced after it reconnects.
 
 ## Voice
 
-The receiver uses the voices built into the browser and picks one in this order:
-Bengali (bn-BD) → any Bengali → English. **Voice settings** lets you choose the voice,
-speed, a chime, and saying each announcement twice. A Bengali voice speaks Bengali
-sentences. Any other voice speaks English sentences.
+The receiver uses the voices built into the browser. Pick the **Announcement language**
+on the receiver page:
+
+- **Auto** (default): Bengali if a Bengali voice is installed, otherwise English.
+- **বাংলা**: always Bengali. A red warning appears if no Bengali voice is installed.
+- **English**: always English.
+
+The choice is saved in that browser. **Voice settings** also lets you pick a specific
+voice, the speed, a chime, and saying each announcement twice. Changing the language
+switches back to the automatic voice for that language.
 
 **Linux:** Chrome has no Bengali voice of its own. Install the system speech engine:
 

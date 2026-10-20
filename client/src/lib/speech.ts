@@ -20,16 +20,21 @@ export function loadVoices(): Promise<SpeechSynthesisVoice[]> {
 
 export const isBengali = (voice: SpeechSynthesisVoice | null) => !!voice?.lang.toLowerCase().startsWith('bn');
 
-/** Best default: Bangladesh Bengali, then any Bengali, then English, then anything. */
-export function pickDefaultVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
-  const lang = (v: SpeechSynthesisVoice) => v.lang.toLowerCase().replace('_', '-');
-  return (
-    voices.find((v) => lang(v) === 'bn-bd') ??
-    voices.find((v) => lang(v).startsWith('bn')) ??
-    voices.find((v) => lang(v).startsWith('en')) ??
-    voices[0] ??
-    null
-  );
+export type VoicePreference = 'auto' | 'bn' | 'en';
+
+const voiceLang = (v: SpeechSynthesisVoice) => v.lang.toLowerCase().replace('_', '-');
+const findBengali = (voices: SpeechSynthesisVoice[]) =>
+  voices.find((v) => voiceLang(v) === 'bn-bd') ?? voices.find((v) => voiceLang(v).startsWith('bn'));
+const findEnglish = (voices: SpeechSynthesisVoice[]) => voices.find((v) => voiceLang(v).startsWith('en'));
+
+/**
+ * Best voice for a language. 'auto' = Bengali if installed, else English.
+ * Falls back to any voice so something is always spoken.
+ */
+export function pickVoice(voices: SpeechSynthesisVoice[], prefer: VoicePreference): SpeechSynthesisVoice | null {
+  const first = prefer === 'en' ? findEnglish(voices) : findBengali(voices);
+  const second = prefer === 'auto' ? findEnglish(voices) : undefined;
+  return first ?? second ?? voices[0] ?? null;
 }
 
 // Chrome can garbage-collect an utterance mid-speech and never fire `end`; keep a reference.
