@@ -258,6 +258,7 @@
 }
 /* List view: rows inside one panel, divided by lines */
 .rows {
+  container-type: inline-size;
   list-style: none;
   margin: 0;
   padding: 0;

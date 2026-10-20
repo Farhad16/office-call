@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { toast } from 'sonner';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import {
   BellRing,
   ChevronDown,
   CircleCheck,
   ExternalLink,
-  History,
+  ListChecks,
+  ShieldCheck,
+  VolumeX,
   LayoutDashboard,
   LoaderCircle,
   Megaphone,
@@ -16,9 +19,13 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react';
-import type { Catalog, OfficeRequest } from '../../../shared/types.js';
+import type { Catalog, OfficeRequest, User } from '../../../shared/types.js';
+import { cleanName, validateName, MAX_NAME_LENGTH } from '../../../shared/names.js';
 import { buildAnnouncement, type AnnounceLanguage } from '../../../shared/announce.js';
-import { errorMessage, getJson } from '../lib/api';
+import { errorMessage, getJson, postJson } from '../lib/api';
+import { loadName, saveName } from '../lib/identity';
+import { useActiveQueue, useStatusChange } from '../lib/useActiveQueue';
+import { RequestCard } from '../components/RequestCard';
 import { socket } from '../lib/socket';
 import { AnnouncementQueue } from '../lib/announcementQueue';
 import {
@@ -51,26 +58,6 @@ const LANGUAGES: { id: VoicePreference; label: string }[] = [
 ];
 const HISTORY_LIMIT = 50;
 
-const STATE_LABEL: Record<ItemState, string> = {
-  waiting: 'Waiting',
-  queued: 'In queue',
-  speaking: 'Speaking…',
-  announced: 'Announced',
-  skipped: 'Done before announced',
-  deleted: 'Deleted',
-  failed: 'Failed',
-};
-
-const STATE_TONE = {
-  waiting: 'neutral',
-  queued: 'info',
-  speaking: 'accent',
-  announced: 'success',
-  skipped: 'neutral',
-  deleted: 'neutral',
-  failed: 'danger',
-} as const;
-
 const SAMPLE_ORDER: OfficeRequest['selection'] = {
   drinks: [{ itemId: 'tea', qty: 1, options: { sugar: 'less', milk: false, ginger: true, lemon: true } }],
   snacks: [
@@ -81,7 +68,6 @@ const SAMPLE_ORDER: OfficeRequest['selection'] = {
 };
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const timeOf = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const AUTOSTART = new URLSearchParams(window.location.search).get('autostart') === '1';
 let testId = 0; // test announcements use negative ids and are never sent to the server
 
@@ -94,7 +80,25 @@ export function ReceiverPage() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [autoBlocked, setAutoBlocked] = useState(false);
-  const [historyRef] = useAutoAnimate<HTMLUListElement>();
+  const [queueRef] = useAutoAnimate<HTMLOListElement>();
+
+  // Receiver sign-in (status buttons need one). Reuses the name saved on this PC.
+  const [user, setUser] = useState<User | null>(null);
+  const [nameInput, setNameInput] = useState(() => loadName() ?? '');
+  const [signInError, setSignInError] = useState<string | null>(null);
+  const [signingIn, setSigningIn] = useState(false);
+  useEffect(() => {
+    const name = loadName();
+    if (!name) return;
+    postJson<User>('/api/users', { name })
+      .then(setUser)
+      .catch(() => {});
+  }, []);
+  const receiver = user?.isStaff ? user : null;
+
+  // The live work queue (same as the dashboard's Active Queue).
+  const liveQueue = useActiveQueue();
+  const { busy, changeStatus } = useStatusChange(receiver, liveQueue);
 
   // A voice picked by hand wins; otherwise the best voice for the chosen language.
   const autoVoice = pickVoice(voices ?? [], settings.language);
@@ -297,6 +301,48 @@ export function ReceiverPage() {
     });
   }
 
+  async function signInAsReceiver(e: FormEvent) {
+    e.preventDefault();
+    const name = cleanName(nameInput);
+    const problem = validateName(name);
+    if (problem) {
+      setSignInError(problem);
+      return;
+    }
+    setSigningIn(true);
+    try {
+      const signedIn = await postJson<User>('/api/users', { name, isStaff: true });
+      saveName(signedIn.name);
+      setUser(signedIn);
+      setSignInError(null);
+      toast.success(`Signed in as ${signedIn.name}`, { description: 'You can now change request status here.' });
+    } catch (err) {
+      setSignInError(errorMessage(err));
+    } finally {
+      setSigningIn(false);
+    }
+  }
+
+  /** Has the speaker said this request yet? Shown under each queue row's status. */
+  function speechLabel(r: OfficeRequest) {
+    const item = history.find((h) => h.request.id === r.id);
+    if (item?.state === 'speaking') return <Badge tone="accent">Speaking…</Badge>;
+    if (item?.state === 'queued') return <Badge tone="info">In line to speak</Badge>;
+    if (item?.state === 'failed')
+      return (
+        <span title={item.error}>
+          <Badge tone="danger">Not spoken</Badge>
+        </span>
+      );
+    const spoken = r.announced || item?.state === 'announced';
+    return (
+      <span className={styles.spoken}>
+        {spoken ? <Volume2 size={12} aria-hidden /> : <VolumeX size={12} aria-hidden />}
+        {spoken ? 'Spoken' : 'Not spoken yet'}
+      </span>
+    );
+  }
+
   const textOf = (r: OfficeRequest) => (catalog ? buildAnnouncement(r, catalog, lang) : '…');
   const speaking = history.find((h) => h.state === 'speaking');
   const queued = history.filter((h) => h.state === 'queued').length;
@@ -493,25 +539,76 @@ export function ReceiverPage() {
             </div>
 
             <section className={`${styles.card} ${styles.historyCard} fade-in`}>
-              <h2>
-                <History size={17} aria-hidden /> Recent requests
-              </h2>
-              {history.length === 0 ? (
-                <p className={styles.muted}>No requests yet.</p>
+              <div className={styles.queueHead}>
+                <h2>
+                  <ListChecks size={17} aria-hidden /> Live queue
+                  {liveQueue.active && <Badge tone="accent">{liveQueue.active.length}</Badge>}
+                </h2>
+                <a href="/dashboard" target="_blank" rel="noopener" className={styles.historyLink}>
+                  History <ExternalLink size={12} aria-hidden />
+                </a>
+              </div>
+
+              {receiver ? (
+                <p className={styles.signedIn}>
+                  <ShieldCheck size={15} aria-hidden />
+                  <span>
+                    Signed in as <strong>{receiver.name}</strong> (receiver)
+                  </span>
+                  <Button size="sm" variant="ghost" onClick={() => setUser(null)}>
+                    Switch
+                  </Button>
+                </p>
               ) : (
-                <ul ref={historyRef} className={styles.history}>
-                  {history.map(({ request, state, error }) => (
-                    <li key={request.id} data-state={state} className="reveal">
-                      <span className={styles.time}>{timeOf(request.createdAt)}</span>
-                      <span className={styles.text}>
-                        {textOf(request)}
-                        {request.id < 0 && <em className={styles.muted}> (test)</em>}
-                        {error && <span className={styles.errorText}> {error}</span>}
-                      </span>
-                      <Badge tone={STATE_TONE[state]}>{STATE_LABEL[state]}</Badge>
+                <form className={styles.signIn} onSubmit={signInAsReceiver} noValidate>
+                  <p className={styles.muted}>
+                    {user ? `${user.name} is a sender. ` : ''}Sign in as a receiver to change request status.
+                  </p>
+                  <div className={styles.signInRow}>
+                    <input
+                      className="input"
+                      value={nameInput}
+                      onChange={(e) => {
+                        setNameInput(e.target.value);
+                        setSignInError(null);
+                      }}
+                      maxLength={MAX_NAME_LENGTH + 10}
+                      placeholder="Your name"
+                      aria-label="Receiver name"
+                    />
+                    <Button type="submit" variant="primary" loading={signingIn} icon={<ShieldCheck size={15} />}>
+                      Sign in as receiver
+                    </Button>
+                  </div>
+                  {signInError && (
+                    <p className={styles.errorText} role="alert">
+                      {signInError}
+                    </p>
+                  )}
+                </form>
+              )}
+
+              {liveQueue.error ? (
+                callout('bad', liveQueue.error)
+              ) : !liveQueue.active || !catalog ? (
+                callout('muted', 'Loading queue…')
+              ) : liveQueue.active.length === 0 ? (
+                <p className={styles.empty}>No active requests. All caught up ☕</p>
+              ) : (
+                <ol ref={queueRef} className={styles.queue}>
+                  {liveQueue.active.map((r) => (
+                    <li key={r.id}>
+                      <RequestCard
+                        request={r}
+                        catalog={catalog}
+                        layout="row"
+                        onChangeStatus={receiver ? changeStatus : undefined}
+                        busy={busy.has(r.id)}
+                        extra={speechLabel(r)}
+                      />
                     </li>
                   ))}
-                </ul>
+                </ol>
               )}
             </section>
           </div>

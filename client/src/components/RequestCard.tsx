@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { BellRing, CircleCheck, Clock, Play, Trash2 } from 'lucide-react';
 import type { Catalog, OfficeRequest, RequestStatus } from '../../../shared/types.js';
 import { NEXT_STATUSES } from '../../../shared/types.js';
@@ -13,7 +14,7 @@ export const STATUS_LABEL: Record<RequestStatus, string> = {
   done: 'Done',
 };
 const STATUS_TONE = { pending: 'warning', in_progress: 'info', done: 'success' } as const;
-const ACTION: Record<RequestStatus, { label: string; icon: React.ReactNode }> = {
+const ACTION: Record<RequestStatus, { label: string; icon: ReactNode }> = {
   pending: { label: '', icon: null },
   in_progress: { label: 'Start', icon: <Play size={14} /> },
   done: { label: 'Mark done', icon: <CircleCheck size={15} /> },
@@ -37,9 +38,19 @@ type Props = {
   selection?: { selected: boolean; onToggle: () => void; onDelete: () => void };
   /** 'row' = compact one-line list item, 'card' = tile for the grid view. */
   layout?: 'card' | 'row';
+  /** Small extra info shown under the status badge (e.g. the speaker's "Spoken" label). */
+  extra?: ReactNode;
 };
 
-export function RequestCard({ request, catalog, onChangeStatus, busy = false, selection, layout = 'card' }: Props) {
+export function RequestCard({
+  request,
+  catalog,
+  onChangeStatus,
+  busy = false,
+  selection,
+  layout = 'card',
+  extra,
+}: Props) {
   const details = request.selection ? describeSelection(request.selection, catalog) : null;
   const actions = onChangeStatus ? NEXT_STATUSES[request.status] : [];
   const showFooter = actions.length > 0 || selection;
@@ -113,6 +124,7 @@ export function RequestCard({ request, catalog, onChangeStatus, busy = false, se
         </div>
         <span className={styles.rowStatus}>
           <StatusBadge status={request.status} />
+          {extra}
         </span>
         <div className={styles.rowActions}>
           {selection && (
@@ -150,7 +162,10 @@ export function RequestCard({ request, catalog, onChangeStatus, busy = false, se
             <Clock size={12} aria-hidden /> {formatTime(request.createdAt)}
           </span>
         </div>
-        <StatusBadge status={request.status} />
+        <span className={styles.cardStatus}>
+          <StatusBadge status={request.status} />
+          {extra}
+        </span>
       </header>
 
       {request.type === 'call' || !details ? (

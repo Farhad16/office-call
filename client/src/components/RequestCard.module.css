@@ -223,8 +223,15 @@
   color: var(--accent);
   font-size: 0.92rem;
 }
-.rowStatus {
+.rowStatus,
+.cardStatus {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.cardStatus {
+  align-items: flex-end;
 }
 .rowActions {
   display: flex;
@@ -232,8 +239,10 @@
   gap: 6px;
   min-width: 0;
 }
-/* Narrow screens: name line on top, items below, buttons at the bottom */
-@media (max-width: 760px) {
+/* Narrow lists: name line on top, items below, buttons at the bottom.
+   A container query, so it follows the list's width (the speaker page's queue column
+   is narrow even on a big screen). The list sets `container-type: inline-size`. */
+@container (max-width: 760px) {
   .row {
     grid-template-columns: auto 34px minmax(0, 1fr) auto;
     grid-template-areas:

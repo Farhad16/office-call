@@ -304,38 +304,93 @@
   color: var(--muted);
 }
 
-/* History */
-.history {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+/* Live queue */
+.queueHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
-.history li {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 12px;
-  align-items: baseline;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border);
+.queueHead h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.history li:last-child {
-  border-bottom: none;
-}
-.history li[data-state='speaking'] {
-  background: var(--accent-soft);
-  margin: 0 -10px;
-  padding: 12px 10px;
-  border-radius: var(--r-md);
-}
-.time {
+.historyLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
 }
-.text {
-  overflow-wrap: anywhere;
-  font-size: 0.93rem;
+.historyLink:hover {
+  color: var(--text);
+}
+.signedIn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 6px 6px 12px;
+  border-radius: var(--r-md);
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 0.88rem;
+}
+.signedIn span {
+  flex: 1;
+}
+.signIn {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.signIn p {
+  margin: 0;
+  font-size: 0.88rem;
+}
+.signInRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.signInRow input {
+  flex: 1 1 160px;
+  height: 40px;
+}
+.queue {
+  container-type: inline-size;
+  list-style: none;
+  margin: 0 -18px -18px;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+.queue > li + li {
+  border-top: 1px solid var(--border);
+}
+.queue > li:last-child article {
+  border-radius: 0 0 var(--r-xl) var(--r-xl);
+}
+.empty {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  color: var(--muted);
+}
+.spoken {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  color: var(--muted);
+  white-space: nowrap;
 }
 .errorText {
+  margin: 0;
   color: var(--danger);
+  font-size: 0.85rem;
 }

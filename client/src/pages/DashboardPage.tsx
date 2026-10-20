@@ -15,20 +15,12 @@ import {
   Trash2,
 } from 'lucide-react';
 import { canDelete } from '../../../shared/types.js';
-import type {
-  ActiveResponse,
-  DeleteResponse,
-  Catalog,
-  HistoryResponse,
-  OfficeRequest,
-  RequestStatus,
-  User,
-} from '../../../shared/types.js';
-import { deleteJson, errorMessage, getJson, patchJson } from '../lib/api';
+import type { DeleteResponse, Catalog, HistoryResponse, OfficeRequest, User } from '../../../shared/types.js';
+import { deleteJson, errorMessage, getJson } from '../lib/api';
 import { socket } from '../lib/socket';
 import { withTransition } from '../lib/transition';
-import { startOfToday } from '../lib/format';
-import { RequestCard, STATUS_LABEL } from '../components/RequestCard';
+import { useActiveQueue, useStatusChange } from '../lib/useActiveQueue';
+import { RequestCard } from '../components/RequestCard';
 import { Button } from '../components/ui/Button';
 import { useConfirm } from '../components/ui/Confirm';
 import { Segmented } from '../components/ui/Segmented';
@@ -63,26 +55,15 @@ function saveView(view: View) {
 }
 const HISTORY_PAGE = 50;
 
-const byCreated = (a: OfficeRequest, b: OfficeRequest) => a.createdAt.localeCompare(b.createdAt) || a.id - b.id;
-
-/** Inserts or replaces by id; an older copy never overwrites a newer one. */
-function upsert(list: OfficeRequest[], request: OfficeRequest): OfficeRequest[] {
-  const i = list.findIndex((r) => r.id === request.id);
-  if (i === -1) return [...list, request];
-  if (list[i].updatedAt > request.updatedAt) return list;
-  const next = [...list];
-  next[i] = request;
-  return next;
-}
-
 export function DashboardPage({ user }: { user: User }) {
   const [tab, setTab] = useState<Tab>('active');
   const [view, setView] = useState<View>(loadView);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
 
-  const [active, setActive] = useState<OfficeRequest[] | null>(null);
-  const [completedToday, setCompletedToday] = useState(0);
-  const [activeError, setActiveError] = useState<string | null>(null);
+  const queue = useActiveQueue();
+  const { active, completedToday, reload: loadActive, remove: removeActive } = queue;
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const activeError = queue.error ?? catalogError;
 
   const [history, setHistory] = useState<OfficeRequest[] | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -91,16 +72,12 @@ export function DashboardPage({ user }: { user: User }) {
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState(''); // debounced search
 
-  const [busy, setBusy] = useState<Set<number>>(new Set());
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const confirm = useConfirm();
   const [activeListRef] = useAutoAnimate<HTMLOListElement>();
   const [historyListRef] = useAutoAnimate<HTMLOListElement>();
 
-  // Ids already counted in "completed today", so a repeated event never counts twice.
-  const counted = useRef(new Set<number>());
-  const since = useRef(startOfToday());
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -111,18 +88,6 @@ export function DashboardPage({ user }: { user: User }) {
   useEffect(() => {
     historyRef.current = JSON.parse(historyKey);
   }, [historyKey]);
-
-  const loadActive = useCallback(() => {
-    since.current = startOfToday();
-    getJson<ActiveResponse>(`/api/requests/active?since=${encodeURIComponent(since.current)}`)
-      .then((res) => {
-        counted.current = new Set();
-        setActive(res.requests);
-        setCompletedToday(res.completedToday);
-        setActiveError(null);
-      })
-      .catch((err) => setActiveError(errorMessage(err)));
-  }, []);
 
   const loadHistory = useCallback(
     (offset: number) => {
@@ -149,9 +114,8 @@ export function DashboardPage({ user }: { user: User }) {
   useEffect(() => {
     getJson<Catalog>('/api/items')
       .then(setCatalog)
-      .catch((err) => setActiveError(errorMessage(err)));
-    loadActive();
-  }, [loadActive]);
+      .catch((err) => setCatalogError(errorMessage(err)));
+  }, []);
 
   // Debounce typing in the search box.
   useEffect(() => {
@@ -166,83 +130,48 @@ export function DashboardPage({ user }: { user: User }) {
     return () => clearTimeout(timer);
   }, [tab, historyKey, loadHistory]);
 
-  /** Applies a new or changed request to every list and the counters. */
-  const apply = useCallback(
+  /** A request just became done: put it on top of History if it matches the filters. */
+  const applyHistory = useCallback(
     (request: OfficeRequest) => {
-      if (request.status === 'done') {
-        setActive((list) => list?.filter((r) => r.id !== request.id) ?? list);
-        if (request.completedAt && request.completedAt >= since.current && !counted.current.has(request.id)) {
-          counted.current.add(request.id);
-          setCompletedToday((n) => n + 1);
-        }
-        // New completions go on top of history if they match the current filters.
-        const p = historyRef.current;
-        const matches =
-          p.q === '' &&
-          (p.type === 'all' || p.type === request.type) &&
-          (!p.mine || request.userId === user.id) &&
-          (p.range === 'all' || (request.completedAt ?? '') >= rangeStart(p.range));
-        if (matches) {
-          setHistory((list) => (list ? [request, ...list.filter((r) => r.id !== request.id)] : list));
-        }
-      } else {
-        setActive((list) => (list ? upsert(list, request).sort(byCreated) : list));
-      }
+      if (request.status !== 'done') return;
+      const p = historyRef.current;
+      const matches =
+        p.q === '' &&
+        (p.type === 'all' || p.type === request.type) &&
+        (!p.mine || request.userId === user.id) &&
+        (p.range === 'all' || (request.completedAt ?? '') >= rangeStart(p.range));
+      if (matches) setHistory((list) => (list ? [request, ...list.filter((r) => r.id !== request.id)] : list));
     },
     [user.id],
   );
 
-  const removeLocal = useCallback((ids: number[]) => {
-    const gone = new Set(ids);
-    setActive((list) => list?.filter((r) => !gone.has(r.id)) ?? list);
-    setHistory((list) => list?.filter((r) => !gone.has(r.id)) ?? list);
-    setSelected((s) => new Set([...s].filter((id) => !gone.has(id))));
-  }, []);
+  const removeLocal = useCallback(
+    (ids: number[]) => {
+      const gone = new Set(ids);
+      removeActive(ids);
+      setHistory((list) => list?.filter((r) => !gone.has(r.id)) ?? list);
+      setSelected((s) => new Set([...s].filter((id) => !gone.has(id))));
+    },
+    [removeActive],
+  );
 
-  // Live updates from every device. After a reconnect, reload to catch anything missed.
+  // History follows live updates too (the Active Queue hook handles the queue itself).
   useEffect(() => {
     const onConnect = () => {
-      loadActive();
       if (tab === 'history') loadHistory(0);
     };
-    // Deleted anywhere: drop it here, and reload counts ("completed today" may change).
-    const onDeleted = ({ ids }: { ids: number[] }) => {
-      removeLocal(ids);
-      loadActive();
-    };
-    socket.on('request:new', apply);
-    socket.on('request:updated', apply);
+    const onDeleted = ({ ids }: { ids: number[] }) => removeLocal(ids);
+    socket.on('request:updated', applyHistory);
     socket.on('request:deleted', onDeleted);
     socket.on('connect', onConnect);
     return () => {
-      socket.off('request:new', apply);
-      socket.off('request:updated', apply);
+      socket.off('request:updated', applyHistory);
       socket.off('request:deleted', onDeleted);
       socket.off('connect', onConnect);
     };
-  }, [apply, loadActive, loadHistory, removeLocal, tab]);
+  }, [applyHistory, loadHistory, removeLocal, tab]);
 
-  async function changeStatus(request: OfficeRequest, to: RequestStatus) {
-    if (busy.has(request.id)) return; // one update per request at a time
-    setBusy((s) => new Set(s).add(request.id));
-    try {
-      const updated = await patchJson<OfficeRequest>(`/api/requests/${request.id}/status`, {
-        userId: user.id,
-        status: to,
-      });
-      apply(updated);
-      toast.success(`${STATUS_LABEL[to]}`, { description: `${request.userName}'s request` });
-    } catch (err) {
-      toast.error(errorMessage(err));
-      loadActive(); // someone else may have changed it; show the real state
-    } finally {
-      setBusy((s) => {
-        const next = new Set(s);
-        next.delete(request.id);
-        return next;
-      });
-    }
-  }
+  const { busy, changeStatus } = useStatusChange(user, queue, applyHistory);
 
   /** Erases requests after a confirm. The server deletes what is allowed and reports the rest. */
   async function remove(ids: number[]) {

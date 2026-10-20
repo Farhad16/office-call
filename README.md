@@ -53,6 +53,11 @@ npm run dev
 4. Leave the tab open and visible all day. Open only **one** receiver tab: every tab
    announces every request.
 
+The right side shows the **live queue** (pending and in progress, oldest first) with
+**Start / Mark done** buttons and whether each request has been spoken yet. Status
+buttons need a receiver: the page reuses the name saved on that PC, or shows a small
+"Sign in as receiver" form. Done requests leave the queue and appear in Dashboard → History.
+
 If the page is reloaded or the network drops, it reconnects by itself. Requests from the
 last 30 minutes that were not announced yet get announced after it reconnects.
 
