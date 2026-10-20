@@ -1,10 +1,13 @@
 import express, { type ErrorRequestHandler } from 'express';
+import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import { DEFAULT_CATALOG } from '../../shared/catalog.js';
 import { UserError } from './db.js';
 import { usersRouter } from './routes/users.js';
+import { requestsRouter } from './routes/requests.js';
+import { setupRealtime } from './realtime.js';
 
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? '0.0.0.0'; // 0.0.0.0 = reachable from other devices on the LAN
@@ -22,6 +25,7 @@ app.get('/api/items', (_req, res) => {
 });
 
 app.use('/api/users', usersRouter);
+app.use('/api/requests', requestsRouter);
 
 // Unknown API routes return JSON, not the React page.
 app.use('/api', (_req, res) => {
@@ -60,6 +64,9 @@ if (clientDist) {
   app.get('/{*path}', (_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
 }
 
-app.listen(PORT, HOST, () => {
+const httpServer = http.createServer(app);
+setupRealtime(httpServer);
+
+httpServer.listen(PORT, HOST, () => {
   console.log(`Office Call server running on http://${HOST}:${PORT}`);
 });

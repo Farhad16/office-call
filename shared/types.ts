@@ -59,3 +59,37 @@ export type Preset = {
 
 /** Error body returned by every failing API call. */
 export type ApiErrorBody = { ok: false; error: string };
+
+export type RequestType = 'order' | 'call';
+export type RequestStatus = 'received' | 'announced';
+
+/** A saved request, as sent to the receiver and the requester. */
+export type OfficeRequest = {
+  id: number;
+  userName: string;
+  type: RequestType;
+  selection: Selection | null; // null for 'call'
+  status: RequestStatus;
+  createdAt: string;
+};
+
+/** Body of POST /api/requests. */
+export type CreateRequestBody = {
+  clientRequestId: string; // random id from the client; the same id is never saved twice
+  userId: number;
+  type: RequestType;
+  selection?: Selection;
+};
+
+// Socket.IO events (see docs/ARCHITECTURE.md).
+export interface ServerToClientEvents {
+  'request:new': (request: OfficeRequest) => void;
+  'request:status': (update: { id: number; status: RequestStatus }) => void;
+  'receiver:status': (status: { online: boolean }) => void;
+}
+
+export interface ClientToServerEvents {
+  /** Receiver registers; the ack returns requests not yet announced. */
+  'receiver:join': (ack: (pending: OfficeRequest[]) => void) => void;
+  'request:announced': (update: { id: number }) => void;
+}

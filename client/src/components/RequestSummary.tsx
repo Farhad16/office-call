@@ -2,12 +2,13 @@ import styles from './sections.module.css';
 
 type Props = {
   lines: string[];
-  busy: boolean;
+  sendLabel: string;
+  disabled: boolean;
   onSend: () => void;
   onClearAll: () => void;
 };
 
-export function RequestSummary({ lines, busy, onSend, onClearAll }: Props) {
+export function RequestSummary({ lines, sendLabel, disabled, onSend, onClearAll }: Props) {
   const empty = lines.length === 0;
   return (
     <div className={styles.summaryBar}>
@@ -30,8 +31,8 @@ export function RequestSummary({ lines, busy, onSend, onClearAll }: Props) {
           </>
         )}
       </div>
-      <button type="button" className={styles.send} onClick={onSend} disabled={empty || busy}>
-        {busy ? 'Sending…' : 'Send Request'}
+      <button type="button" className={styles.send} onClick={onSend} disabled={empty || disabled}>
+        {sendLabel}
       </button>
     </div>
   );

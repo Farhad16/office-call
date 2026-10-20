@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Preset, Selection, User } from '../../shared/types.js';
+import type { OfficeRequest, Preset, RequestType, Selection, User } from '../../shared/types.js';
 
 // Database file: server/data/office.db (override with DB_PATH).
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -156,4 +156,86 @@ export function updatePreset(userId: number, id: number, name: string, selection
 export function deletePreset(userId: number, id: number): void {
   const info = deletePresetRow.run(id, userId);
   if (info.changes === 0) throw new UserError('Preset not found.', 404);
+}
+
+// ---------- requests ----------
+
+type RequestRow = {
+  id: number;
+  user_id: number;
+  user_name: string;
+  type: RequestType;
+  selection: string | null;
+  status: OfficeRequest['status'];
+  created_at: string;
+};
+
+function toRequest(row: RequestRow): OfficeRequest {
+  return {
+    id: row.id,
+    userName: row.user_name,
+    type: row.type,
+    selection: row.selection ? (JSON.parse(row.selection) as Selection) : null,
+    status: row.status,
+    createdAt: row.created_at,
+  };
+}
+
+const REQUEST_SELECT = `
+  SELECT r.id, r.user_id, u.name AS user_name, r.type, r.selection, r.status, r.created_at
+  FROM requests r JOIN users u ON u.id = r.user_id`;
+
+const insertRequestRow = db.prepare<[string, number, RequestType, string | null]>(
+  `INSERT INTO requests (client_request_id, user_id, type, selection) VALUES (?, ?, ?, ?)
+   ON CONFLICT (client_request_id) DO NOTHING`,
+);
+const getRequestByClientId = db.prepare<[string], RequestRow>(`${REQUEST_SELECT} WHERE r.client_request_id = ?`);
+const countRecentByUser = db.prepare<[number], { n: number }>(
+  `SELECT COUNT(*) AS n FROM requests WHERE user_id = ? AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 minute')`,
+);
+const markAnnouncedRow = db.prepare<[number]>(
+  `UPDATE requests SET status = 'announced', announced_at = ${NOW} WHERE id = ? AND status = 'received'`,
+);
+const listPendingRows = db.prepare<[], RequestRow>(
+  `${REQUEST_SELECT} WHERE r.status = 'received'
+   AND r.created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes') ORDER BY r.id`,
+);
+const listRecentRows = db.prepare<[number], RequestRow>(`${REQUEST_SELECT} ORDER BY r.id DESC LIMIT ?`);
+
+export const MAX_REQUESTS_PER_MINUTE = 10;
+
+/**
+ * Saves a request. If this clientRequestId was already saved (a retry), returns the
+ * existing row with `created: false` so it is not announced twice.
+ */
+export function createRequest(
+  clientRequestId: string,
+  userId: number,
+  type: RequestType,
+  selection: Selection | null,
+): { request: OfficeRequest; created: boolean } {
+  const existing = getRequestByClientId.get(clientRequestId);
+  if (existing) {
+    if (existing.user_id !== userId) throw new UserError('Invalid request id.', 409);
+    return { request: toRequest(existing), created: false };
+  }
+  if (countRecentByUser.get(userId)!.n >= MAX_REQUESTS_PER_MINUTE) {
+    throw new UserError('Too many requests. Please wait a minute.', 429);
+  }
+  insertRequestRow.run(clientRequestId, userId, type, selection ? JSON.stringify(selection) : null);
+  return { request: toRequest(getRequestByClientId.get(clientRequestId)!), created: true };
+}
+
+/** Returns true if the status changed (false if already announced or unknown). */
+export function markAnnounced(id: number): boolean {
+  return markAnnouncedRow.run(id).changes > 0;
+}
+
+/** Not-yet-announced requests from the last 30 minutes. Older ones are too stale to announce. */
+export function listPendingRequests(): OfficeRequest[] {
+  return listPendingRows.all().map(toRequest);
+}
+
+export function listRecentRequests(limit: number): OfficeRequest[] {
+  return listRecentRows.all(limit).map(toRequest);
 }

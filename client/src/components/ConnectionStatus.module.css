@@ -1,0 +1,26 @@
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+.status[data-tone='good'] .dot {
+  background: var(--success);
+}
+.status[data-tone='warn'] .dot {
+  background: #e0a030;
+}
+.status[data-tone='bad'] {
+  color: var(--danger);
+}
+.status[data-tone='bad'] .dot {
+  background: var(--danger);
+}

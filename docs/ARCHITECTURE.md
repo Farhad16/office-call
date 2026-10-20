@@ -152,6 +152,20 @@ Errors always come back as `{ "ok": false, "error": "<message for the user>" }`.
 Socket.IO reconnects by itself after network drops. On reconnect the receiver sends
 `receiver:join` again and picks up any requests it missed.
 
+### Delivery rules
+
+- `POST /api/requests` body: `{ clientRequestId, userId, type: "order" | "call", selection? }`.
+  Response: `{ request, receiverOnline }`.
+- The server saves first, then emits `request:new`. The app shows "sent" only after a
+  successful response.
+- `clientRequestId` is random per request. A retry of the same request reuses it, so a
+  lost response never creates a duplicate.
+- After a successful send the button is disabled for 4 seconds (stops double taps).
+- At most 10 requests per user per minute (`429` after that).
+- When a receiver joins, it gets requests not yet announced from the **last 30 minutes**.
+  Older ones are too stale to announce, but still appear in history.
+- Open **one** receiver tab only. Every receiver tab announces every request.
+
 ## Implementation plan
 
 1. **Setup + name entry** — workspaces, Vite app, Express skeleton, remember name.
