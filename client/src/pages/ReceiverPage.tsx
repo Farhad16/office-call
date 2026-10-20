@@ -307,8 +307,14 @@ export function ReceiverPage() {
     <main className={styles.page}>
       <header className={styles.header}>
         <h1>📢 Office Call · Speaker</h1>
-        <span className={styles.pill} data-ok={connected && started}>
-          {!connected ? 'Disconnected, reconnecting…' : started ? 'Listening' : 'Not started'}
+        <span className={styles.headerRight}>
+          {/* New tab, so this speaker tab keeps running. */}
+          <a href="/dashboard" target="_blank" rel="noopener" className={styles.dashLink}>
+            Open dashboard ↗
+          </a>
+          <span className={styles.pill} data-ok={connected && started}>
+            {!connected ? 'Disconnected, reconnecting…' : started ? 'Listening' : 'Not started'}
+          </span>
         </span>
       </header>
 
