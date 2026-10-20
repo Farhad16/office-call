@@ -1,0 +1,26 @@
+.center { text-align: center; margin-top: 40px; color: var(--muted); }
+.retry {
+  margin-top: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.call {
+  width: 100%;
+  margin-top: 16px;
+  padding: 14px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border-radius: 14px;
+  border: 2px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+.success, .error, .info { margin: 12px 0 0; padding: 10px 14px; border-radius: 10px; }
+.success { background: color-mix(in srgb, var(--success) 15%, var(--bg)); color: var(--success); }
+.error { background: color-mix(in srgb, var(--danger) 15%, var(--bg)); color: var(--danger); }
+.info { background: var(--surface); border: 1px solid var(--border); }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NameEntry } from './components/NameEntry';
 import { loadName, saveName } from './lib/identity';
+import { OrderPage } from './pages/OrderPage';
 import styles from './App.module.css';
 
 export default function App() {
@@ -31,7 +32,7 @@ export default function App() {
           {name} ✎
         </button>
       </header>
-      <p className={styles.welcome}>Hi {name}! Drinks, snacks and custom requests come in Phase 2.</p>
+      <OrderPage />
     </main>
   );
 }
