@@ -24,22 +24,7 @@
   color: var(--accent);
   cursor: pointer;
 }
-.success,
-.error,
-.info {
-  margin: 12px 0 0;
-  padding: 10px 14px;
-  border-radius: 10px;
-}
-.success {
-  background: color-mix(in srgb, var(--success) 15%, var(--bg));
-  color: var(--success);
-}
 .error {
   background: color-mix(in srgb, var(--danger) 15%, var(--bg));
   color: var(--danger);
-}
-.info {
-  background: var(--surface);
-  border: 1px solid var(--border);
 }

@@ -1,14 +1,17 @@
 import styles from './sections.module.css';
 
+export type Notice = { kind: 'success' | 'error' | 'info'; text: string };
+
 type Props = {
   lines: string[];
+  notice: Notice | null; // result of the last send or call; shown here so it is always on screen
   sendLabel: string;
   disabled: boolean;
   onSend: () => void;
   onClearAll: () => void;
 };
 
-export function RequestSummary({ lines, sendLabel, disabled, onSend, onClearAll }: Props) {
+export function RequestSummary({ lines, notice, sendLabel, disabled, onSend, onClearAll }: Props) {
   const empty = lines.length === 0;
   return (
     <div className={styles.summaryBar}>
@@ -31,6 +34,11 @@ export function RequestSummary({ lines, sendLabel, disabled, onSend, onClearAll 
           </>
         )}
       </div>
+      {notice && (
+        <p className={styles.notice} data-kind={notice.kind} role={notice.kind === 'error' ? 'alert' : 'status'}>
+          {notice.text}
+        </p>
+      )}
       <button type="button" className={styles.send} onClick={onSend} disabled={empty || disabled}>
         {sendLabel}
       </button>

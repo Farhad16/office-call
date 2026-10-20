@@ -2,17 +2,26 @@
 
 Request tea, coffee, snacks or help with one tap. The office computer announces it in Bengali.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for design, schema and events.
+- **Office PC setup, phones, HTTPS, troubleshooting:** [docs/DEPLOY.md](docs/DEPLOY.md)
+- **Design, schema, API and events:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
+## Quick start (office computer)
+
+```bash
+npm install
+npm run build
+npm start                          # prints the addresses for phones
+```
+
+- App: `http://<office-pc-ip>:3000`. Find the IP with `hostname -I`.
+- Receiver (speaker): `http://localhost:3000/receiver` in Chrome on the office PC.
+
+For start-at-boot, HTTPS and installing the app on phones, follow [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Requirements
 
 - Node.js 20+ (`node -v`)
-
-## Install
-
-```bash
-npm install
-```
+- Google Chrome on the office PC (for the receiver)
 
 ## Development
 
@@ -22,6 +31,8 @@ npm run dev
 
 - App: http://localhost:5173 (other devices: `http://<office-pc-ip>:5173`)
 - API: http://localhost:3000/api/health
+- The installable-app files (service worker) are only made by `npm run build`, so test
+  installing with `npm start`, not `npm run dev`.
 
 ## Receiver (office speaker)
 
@@ -67,11 +78,14 @@ espeak-ng works offline, but the voice sounds robotic. For a natural Bengali voi
 - In the receiver, change `speak()` in `client/src/lib/speech.ts` so it plays that audio
   with an `<audio>` element. The queue, sentence builder and everything else stay the same.
 
-## Data
+## Configuration
 
-- Database file: `server/data/office.db` (SQLite). Change with `DB_PATH=/path/to/file.db`.
-- Back up by copying the file while the server is stopped.
-- Add or change drinks/snacks in `shared/catalog.ts`, then rebuild and restart.
+| Setting                 | How                                                            |
+| ----------------------- | -------------------------------------------------------------- |
+| Port                    | `PORT=3000` (default)                                          |
+| Database file           | `DB_PATH=/path/to/office.db` (default `server/data/office.db`) |
+| HTTPS                   | put `key.pem` + `cert.pem` in `certs/` (or set `CERT_DIR`)     |
+| Drinks, snacks, options | edit `shared/catalog.ts`, then rebuild and restart             |
 
 ## Code checks
 
@@ -80,12 +94,3 @@ npm run lint          # ESLint: finds bugs and bad patterns
 npm run format        # Prettier: auto-formats all files
 npm run check         # lint + format check + build (run before committing)
 ```
-
-## Production (office computer)
-
-```bash
-npm run build
-npm start
-```
-
-Open `http://<office-pc-ip>:3000`. Find the IP with `hostname -I`.

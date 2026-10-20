@@ -7,12 +7,11 @@ import { socket, useConnection } from '../lib/socket';
 import { DrinkSection } from '../components/DrinkSection';
 import { SnackSection } from '../components/SnackSection';
 import { CustomSection } from '../components/CustomSection';
-import { RequestSummary } from '../components/RequestSummary';
+import { RequestSummary, type Notice } from '../components/RequestSummary';
 import { PresetBar } from '../components/PresetBar';
 import { ConnectionStatus } from '../components/ConnectionStatus';
 import styles from './OrderPage.module.css';
 
-type Notice = { kind: 'success' | 'error' | 'info'; text: string } | null;
 type CreateResponse = { request: OfficeRequest; receiverOnline: boolean };
 
 /** After a successful send, the same button stays disabled this long to stop double taps. */
@@ -22,7 +21,7 @@ export function OrderPage({ user }: { user: User }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(emptySelection);
-  const [notice, setNotice] = useState<Notice>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
   const [sending, setSending] = useState<RequestType | null>(null);
   const [cooldown, setCooldown] = useState<RequestType | null>(null);
   const [lastSentId, setLastSentId] = useState<number | null>(null);
@@ -123,12 +122,6 @@ export function OrderPage({ user }: { user: User }) {
         {sending === 'call' ? 'Calling…' : cooldown === 'call' ? 'Called ✓' : '🔔 Call Staff'}
       </button>
 
-      {notice && (
-        <p className={styles[notice.kind]} role={notice.kind === 'error' ? 'alert' : 'status'}>
-          {notice.text}
-        </p>
-      )}
-
       <PresetBar user={user} catalog={catalog} selection={selection} onLoad={setSelection} />
 
       <DrinkSection
@@ -144,6 +137,7 @@ export function OrderPage({ user }: { user: User }) {
       <CustomSection value={selection.custom} onChange={(custom) => setSelection((s) => ({ ...s, custom }))} />
       <RequestSummary
         lines={summary}
+        notice={notice}
         sendLabel={sending === 'order' ? 'Sending…' : cooldown === 'order' ? 'Sent ✓' : 'Send Request'}
         disabled={sending !== null || cooldown === 'order'}
         onSend={() => send('order')}

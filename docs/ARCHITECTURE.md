@@ -30,7 +30,9 @@
 ```
 office-call/
 ├── package.json            # npm workspaces + root scripts
-├── docs/ARCHITECTURE.md
+├── docs/                   # ARCHITECTURE.md, DEPLOY.md
+├── deploy/                 # make-certs.sh, install-service.sh, receiver-autostart.sh
+├── certs/                  # HTTPS files (created on the office PC, not in git)
 ├── client/                 # React + TypeScript + Vite (PWA)
 │   ├── index.html
 │   ├── vite.config.ts

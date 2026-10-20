@@ -214,3 +214,21 @@
   opacity: 0.45;
   cursor: default;
 }
+.notice {
+  margin: 8px 0 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.notice[data-kind='success'] {
+  background: color-mix(in srgb, var(--success) 15%, var(--bg));
+  color: var(--success);
+  border-color: transparent;
+}
+.notice[data-kind='error'] {
+  background: color-mix(in srgb, var(--danger) 15%, var(--bg));
+  color: var(--danger);
+  border-color: transparent;
+}

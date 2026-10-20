@@ -49,6 +49,7 @@ const SAMPLE_ORDER: OfficeRequest['selection'] = {
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const AUTOSTART = new URLSearchParams(window.location.search).get('autostart') === '1';
 let testId = 0; // test announcements use negative ids and are never sent to the server
 
 export function ReceiverPage() {
@@ -59,6 +60,7 @@ export function ReceiverPage() {
   const [connected, setConnected] = useState(socket.connected);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [autoBlocked, setAutoBlocked] = useState(false);
 
   // A voice picked by hand wins; otherwise the best voice for the chosen language.
   const autoVoice = pickVoice(voices ?? [], settings.language);
@@ -136,17 +138,29 @@ export function ReceiverPage() {
     q.add(request);
   }
 
-  // Must run from a click: browsers only allow sound after the user interacts with the page.
-  async function start() {
-    setError(null);
+  /**
+   * Turns on sound and starts listening. Browsers only allow sound after a click, so this
+   * normally runs from the Start button. With `auto` (from ?autostart=1) it gives up quietly
+   * if the browser still blocks sound, and the Start button stays visible.
+   */
+  async function start(auto = false) {
+    let ctx: AudioContext | null;
     try {
       const Ctx =
         window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      audioCtx.current = new Ctx();
-      await audioCtx.current.resume();
+      ctx = new Ctx();
+      // resume() never settles while sound is blocked, so don't wait forever.
+      await Promise.race([ctx.resume(), pause(800)]);
     } catch {
-      audioCtx.current = null; // chime off, speech may still work
+      ctx = null; // chime off, speech may still work
     }
+    if (auto && ctx?.state !== 'running') {
+      ctx?.close().catch(() => {});
+      setAutoBlocked(true);
+      return;
+    }
+    audioCtx.current = ctx;
+    setError(null);
     queue.current = new AnnouncementQueue(announce);
     try {
       const recent = await getJson<OfficeRequest[]>('/api/requests/recent?limit=30');
@@ -158,6 +172,20 @@ export function ReceiverPage() {
     }
     setStarted(true);
   }
+
+  // ?autostart=1: try to start as soon as the menu and voices are ready.
+  const [autoTried, setAutoTried] = useState(false);
+  const ready = catalog !== null && voices !== null;
+  useEffect(() => {
+    if (!AUTOSTART || autoTried || !ready) return;
+    const timer = setTimeout(() => {
+      setAutoTried(true);
+      start(true);
+    }, 0);
+    return () => clearTimeout(timer);
+    // start only touches refs and state setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, autoTried]);
 
   // Once started: register as receiver (again after every reconnect) and listen for requests.
   useEffect(() => {
@@ -270,7 +298,12 @@ export function ReceiverPage() {
           <p>Keep this page open on the office computer, with the speaker on. Click once to turn on sound.</p>
           {languagePicker}
           {voiceInfo}
-          <button className={styles.start} onClick={start} disabled={!catalog}>
+          {autoBlocked && (
+            <p className={styles.warn}>
+              The browser blocked automatic sound. Click Start once (or see docs/DEPLOY.md to allow it).
+            </p>
+          )}
+          <button className={styles.start} onClick={() => start()} disabled={!catalog}>
             🔊 Start receiver
           </button>
         </section>

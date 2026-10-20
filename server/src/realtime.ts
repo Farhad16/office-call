@@ -1,4 +1,5 @@
 import type { Server as HttpServer } from 'node:http';
+import type { Server as HttpsServer } from 'node:https';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, OfficeRequest, ServerToClientEvents } from '../../shared/types.js';
 import { listPendingRequests, markAnnounced } from './db.js';
@@ -16,7 +17,7 @@ function broadcastReceiverStatus() {
   io?.emit('receiver:status', { online: receiverOnline() });
 }
 
-export function setupRealtime(httpServer: HttpServer) {
+export function setupRealtime(httpServer: HttpServer | HttpsServer) {
   io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, { serveClient: false });
 
   io.on('connection', (socket) => {
@@ -45,6 +46,10 @@ export function setupRealtime(httpServer: HttpServer) {
 /** Pushes a newly saved request to every open receiver page. */
 export function deliverRequest(request: OfficeRequest) {
   io?.to(RECEIVERS).emit('request:new', request);
+}
+
+export function closeRealtime() {
+  io?.close();
 }
 
 export { receiverOnline };
