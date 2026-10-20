@@ -1,0 +1,18 @@
+.toggle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--success-soft);
+  color: var(--success);
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.toggle[data-muted] {
+  background: var(--surface-2);
+  color: var(--muted);
+}

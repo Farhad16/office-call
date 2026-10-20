@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { toast } from 'sonner';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import {
@@ -391,7 +391,11 @@ export function DashboardPage({ user }: { user: User }) {
           ) : (
             <>
               {toolbar}
-              <ol ref={activeListRef} className={view === 'list' ? styles.rows : styles.list}>
+              <ol
+                ref={activeListRef}
+                className={view === 'list' ? styles.rows : styles.list}
+                style={{ '--row-actions': user.isStaff ? '260px' : '40px' } as CSSProperties}
+              >
                 {active.map((r) => (
                   <li key={r.id}>
                     <RequestCard
@@ -423,7 +427,11 @@ export function DashboardPage({ user }: { user: User }) {
           ) : (
             <>
               {toolbar}
-              <ol ref={historyListRef} className={view === 'list' ? styles.rows : styles.list}>
+              <ol
+                ref={historyListRef}
+                className={view === 'list' ? styles.rows : styles.list}
+                style={{ '--row-actions': '40px' } as CSSProperties}
+              >
                 {history.map((r) => (
                   <li key={r.id}>
                     <RequestCard

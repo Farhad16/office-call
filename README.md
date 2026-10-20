@@ -18,6 +18,9 @@ npm start                          # prints the addresses for phones
 - Dashboard: the **Dashboard** tab (`/dashboard`) shows the live queue and history.
   - Senders can delete their own orders unless they are in progress.
   - Tick **I am a receiver** when signing in to change status and delete done orders.
+    Receivers only see the Dashboard (the Order page redirects there) and hear an alert
+    sound for every new request: a chime for orders, a ring for Call Staff. Mute with the
+    speaker button in the header.
   - Tick several cards to delete them together.
   - Switch between **List** (default) and **Cards** view; the choice is remembered per device.
 

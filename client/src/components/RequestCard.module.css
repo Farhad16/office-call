@@ -155,7 +155,8 @@
 .row {
   position: relative;
   display: grid;
-  grid-template-columns: 22px 34px minmax(120px, 190px) minmax(0, 1fr) 112px auto;
+  /* --row-actions is set by the list, so every row lines up */
+  grid-template-columns: 22px 34px minmax(120px, 190px) minmax(0, 1fr) 112px var(--row-actions, auto);
   align-items: center;
   gap: 14px;
   padding: 12px 16px 12px 18px;

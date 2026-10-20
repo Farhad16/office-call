@@ -1,6 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Coffee, LayoutDashboard, LoaderCircle, RefreshCw, ShoppingBag, WifiOff } from 'lucide-react';
+import {
+  Coffee,
+  ExternalLink,
+  LayoutDashboard,
+  LoaderCircle,
+  Megaphone,
+  RefreshCw,
+  ShoppingBag,
+  WifiOff,
+} from 'lucide-react';
 import type { User } from '../../shared/types.js';
 import { NameEntry } from './components/NameEntry';
 import { OrderPage } from './pages/OrderPage';
@@ -9,6 +18,7 @@ import { useRoute } from './lib/route';
 import { clearName, loadName, saveName } from './lib/identity';
 import { errorMessage, patchJson, postJson } from './lib/api';
 import { Button } from './components/ui/Button';
+import { AlertToggle } from './components/AlertToggle';
 import styles from './App.module.css';
 
 type Session =
@@ -56,6 +66,13 @@ export default function App() {
       cancelled = true;
     };
   }, [savedName]);
+
+  // Receivers work on the dashboard only: send them there from the order page.
+  const isReceiver = session.status === 'ready' && session.user.isStaff;
+  useEffect(() => {
+    if (isReceiver && route === 'order') navigate('dashboard', true);
+  }, [isReceiver, route, navigate]);
+  const showDashboard = useCallback(() => navigate('dashboard'), [navigate]);
 
   function switchUser() {
     clearName();
@@ -149,21 +166,37 @@ export default function App() {
             Office Call
           </span>
           <nav className={styles.tabs} aria-label="Pages">
-            {(['order', 'dashboard'] as const).map((r) => (
-              <a
-                key={r}
-                href={r === 'order' ? '/' : '/dashboard'}
-                aria-current={route === r ? 'page' : undefined}
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate(r);
-                }}
-              >
-                {r === 'order' ? <ShoppingBag size={16} aria-hidden /> : <LayoutDashboard size={16} aria-hidden />}
-                <span>{r === 'order' ? 'Order' : 'Dashboard'}</span>
-              </a>
-            ))}
+            {user.isStaff ? (
+              <>
+                <a href="/dashboard" aria-current="page" onClick={(e) => e.preventDefault()}>
+                  <LayoutDashboard size={16} aria-hidden />
+                  <span>Dashboard</span>
+                </a>
+                {/* New tab, so the dashboard keeps running here. */}
+                <a href="/receiver" target="_blank" rel="noopener" title="Open the speaker page in a new tab">
+                  <Megaphone size={16} aria-hidden />
+                  <span>Speaker</span>
+                  <ExternalLink size={12} aria-hidden />
+                </a>
+              </>
+            ) : (
+              (['order', 'dashboard'] as const).map((r) => (
+                <a
+                  key={r}
+                  href={r === 'order' ? '/' : '/dashboard'}
+                  aria-current={route === r ? 'page' : undefined}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate(r);
+                  }}
+                >
+                  {r === 'order' ? <ShoppingBag size={16} aria-hidden /> : <LayoutDashboard size={16} aria-hidden />}
+                  <span>{r === 'order' ? 'Order' : 'Dashboard'}</span>
+                </a>
+              ))
+            )}
           </nav>
+          {user.isStaff && <AlertToggle user={user} onView={showDashboard} />}
           <button className={styles.user} onClick={() => setEditingName(true)} title="Profile: change name or role">
             <span className={styles.avatar} aria-hidden>
               {initials}
@@ -178,10 +211,12 @@ export default function App() {
       <main className={styles.page}>
         {/* The order page stays mounted (hidden) so a half-finished selection survives switching tabs.
             key: a different user gets a fresh page (their own presets). */}
-        <div hidden={route !== 'order'}>
-          <OrderPage key={user.id} user={user} />
-        </div>
-        {route === 'dashboard' && <DashboardPage user={user} />}
+        {!user.isStaff && (
+          <div hidden={route !== 'order'}>
+            <OrderPage key={user.id} user={user} />
+          </div>
+        )}
+        {(route === 'dashboard' || user.isStaff) && <DashboardPage user={user} />}
       </main>
     </>
   );

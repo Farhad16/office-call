@@ -100,6 +100,13 @@ requests. (In code and the database this is `isStaff` / `users.is_staff`.)
 | Delete someone else's order | ❌                    | ✅ only if Done   |
 
 - **Delete erases the order permanently.** It can't be undone.
+- Receivers don't use the Order page: `/` redirects them to `/dashboard`, and the header
+  shows Dashboard plus a link to the speaker page (`/receiver`, new tab).
+- Receivers get an **alert** for every new request from someone else, on any page of the
+  app: a toast plus a sound (`client/src/lib/sounds.ts`, Web Audio, no files). Order =
+  two-note chime, Call Staff = triple ring. The mute button is remembered per device.
+  Browsers allow sound only after a click, so after a reload a "Turn on sound alerts"
+  toast asks for one click.
 - **This is not real security.** Anyone can tick the box or type a receiver's name. It
   only stops mistakes. Real protection would need a PIN or password checked by the server.
 
