@@ -48,7 +48,10 @@ export type Selection = {
   custom: string;
 };
 
-/** isStaff: may change request statuses. Name-based, so NOT real security (see docs). */
+/**
+ * isStaff: a "receiver", who handles requests (change status, delete done orders).
+ * Name-based, so NOT real security (see docs).
+ */
 export type User = { id: number; name: string; isStaff: boolean };
 
 export type Preset = {
@@ -75,6 +78,7 @@ export const NEXT_STATUSES: Record<RequestStatus, RequestStatus[]> = {
 /** A saved request, as sent to the receiver, the requester and the dashboard. */
 export type OfficeRequest = {
   id: number;
+  userId: number; // requester
   userName: string; // requester's name at the time of the request
   type: RequestType;
   selection: Selection | null; // null for 'call'
@@ -88,6 +92,18 @@ export type OfficeRequest = {
 
 /** GET /api/requests/active */
 export type ActiveResponse = { requests: OfficeRequest[]; completedToday: number };
+/** DELETE /api/requests: what was erased and what was not allowed. */
+export type DeleteResponse = { deleted: number[]; skipped: { id: number; reason: string }[] };
+
+/**
+ * Who may erase a request: the sender, unless it is in progress; a receiver, once it is done.
+ * Used by the UI to show checkboxes. The server checks the same rule.
+ */
+export function canDelete(request: Pick<OfficeRequest, 'userId' | 'status'>, user: User): boolean {
+  if (request.userId === user.id && request.status !== 'in_progress') return true;
+  return user.isStaff && request.status === 'done';
+}
+
 /** GET /api/requests/history */
 export type HistoryResponse = { requests: OfficeRequest[]; hasMore: boolean };
 
@@ -104,6 +120,8 @@ export interface ServerToClientEvents {
   'request:new': (request: OfficeRequest) => void;
   /** Sent after any change: announced, or a status change by staff. Never re-announced. */
   'request:updated': (request: OfficeRequest) => void;
+  /** Requests erased for good. */
+  'request:deleted': (update: { ids: number[] }) => void;
   'receiver:status': (status: { online: boolean }) => void;
 }
 

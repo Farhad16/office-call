@@ -122,7 +122,7 @@ export default function App() {
         <span className={styles.brand}>☕ Office Call</span>
         <button className={styles.nameButton} onClick={() => setEditingName(true)} title="Change name">
           {user.name}
-          {user.isStaff && <span className={styles.staffBadge}>Staff</span>} ✎
+          {user.isStaff && <span className={styles.staffBadge}>Receiver</span>} ✎
         </button>
       </header>
       <nav className={styles.tabs} aria-label="Pages">

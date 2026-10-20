@@ -111,3 +111,23 @@
   opacity: 0.55;
   cursor: default;
 }
+.card[data-selected] {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.head h3 {
+  flex: 1;
+}
+.select {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  align-self: center;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.actions .delete {
+  margin-right: auto;
+  color: var(--danger);
+  font-weight: 500;
+}

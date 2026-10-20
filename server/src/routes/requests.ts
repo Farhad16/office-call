@@ -4,6 +4,7 @@ import { validateSelection } from '../../../shared/selection.js';
 import {
   NEXT_STATUSES,
   type ActiveResponse,
+  type DeleteResponse,
   type CreateRequestBody,
   type HistoryResponse,
   type RequestStatus,
@@ -16,9 +17,10 @@ import {
   listActiveRequests,
   listHistory,
   listRecentRequests,
+  deleteRequests,
   setRequestStatus,
 } from '../db.js';
-import { broadcastNew, broadcastUpdate, receiverOnline } from '../realtime.js';
+import { broadcastDeleted, broadcastNew, broadcastUpdate, receiverOnline } from '../realtime.js';
 
 export const requestsRouter = Router();
 
@@ -84,17 +86,34 @@ requestsRouter.get('/history', (req, res) => {
   res.json(body);
 });
 
-// Staff only: move a request forward (pending → in_progress → done).
+// Receivers (staff) only: move a request forward (pending → in_progress → done).
 requestsRouter.patch('/:id/status', (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) throw new UserError('Invalid id.');
   const staff = readUser(req.body?.userId);
   // Checked here, not only in the UI. Name-based login, so this is not strong security.
-  if (!staff.isStaff) throw new UserError('Only staff can change request status.', 403);
+  if (!staff.isStaff) throw new UserError('Only receivers can change request status.', 403);
   const to = req.body?.status as RequestStatus;
   if (!(to in NEXT_STATUSES) || to === 'pending') throw new UserError('Invalid status.');
 
   const updated = setRequestStatus(id, to, staff.name);
   broadcastUpdate(updated);
   res.json(updated);
+});
+
+// Erase one or many requests: body { userId, ids }. Allowed ones are deleted, others reported.
+requestsRouter.delete('/', (req, res) => {
+  const user = readUser(req.body?.userId);
+  const ids: unknown = req.body?.ids;
+  if (
+    !Array.isArray(ids) ||
+    ids.length === 0 ||
+    ids.length > 200 ||
+    !ids.every((id) => Number.isInteger(id) && id > 0)
+  ) {
+    throw new UserError('Send 1 to 200 request ids.');
+  }
+  const result: DeleteResponse = deleteRequests(user, ids as number[]);
+  if (result.deleted.length) broadcastDeleted(result.deleted);
+  res.json(result);
 });

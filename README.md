@@ -14,9 +14,11 @@ npm start                          # prints the addresses for phones
 ```
 
 - App: `http://<office-pc-ip>:3000`. Find the IP with `hostname -I`.
-- Receiver (speaker): `http://localhost:3000/receiver` in Chrome on the office PC.
+- Speaker page: `http://localhost:3000/receiver` in Chrome on the office PC.
 - Dashboard: the **Dashboard** tab (`/dashboard`) shows the live queue and history.
-  Tick **I am staff** when signing in to change request status.
+  - Senders can delete their own orders unless they are in progress.
+  - Tick **I am a receiver** when signing in to change status and delete done orders.
+  - Tick several cards to delete them together.
 
 For start-at-boot, HTTPS and installing the app on phones, follow [docs/DEPLOY.md](docs/DEPLOY.md).
 
@@ -36,11 +38,11 @@ npm run dev
 - The installable-app files (service worker) are only made by `npm run build`, so test
   installing with `npm start`, not `npm run dev`.
 
-## Receiver (office speaker)
+## Speaker page (office PC)
 
 1. On the office computer, open **Google Chrome** at `http://localhost:3000/receiver`
    (dev: `http://localhost:5173/receiver`). Plug in the speaker.
-2. Click **🔊 Start receiver** once. Browsers block sound until you click on the page.
+2. Click **🔊 Start speaker** once. Browsers block sound until you click on the page.
 3. Click **Test order** and **Test call** to check the voice.
 4. Leave the tab open and visible all day. Open only **one** receiver tab: every tab
    announces every request.

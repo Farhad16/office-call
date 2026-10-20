@@ -57,6 +57,11 @@ export function broadcastUpdate(request: OfficeRequest) {
   io?.emit('request:updated', request);
 }
 
+/** Requests erased for good: dashboards drop them, the speaker skips them if still queued. */
+export function broadcastDeleted(ids: number[]) {
+  io?.emit('request:deleted', { ids });
+}
+
 export function closeRealtime() {
   io?.close();
 }

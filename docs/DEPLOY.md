@@ -66,7 +66,7 @@ bash deploy/receiver-autostart.sh              # open the receiver at every logi
 ```
 
 After the next login, Chrome opens `/receiver?autostart=1` and starts by itself. If it
-shows **"The browser blocked automatic sound"**, click **Start receiver** once. That happens
+shows **"The browser blocked automatic sound"**, click **Start speaker** once. That happens
 when Chrome was already running before login, because then Chrome ignores the startup
 settings that allow sound without a click.
 
@@ -149,7 +149,10 @@ data needs extra setup, which this project doesn't include:
 - Identity is **name only**. Anyone can type any name and use that person's presets. This
   is fine for an internal office tool. Don't store anything private.
 - Two people with the same name share one identity. Use nicknames or initials.
-- **Staff mode is a checkbox, not a login.** Anyone can tick "I am staff". The server
-  only lets staff change status, but it can't prove who is staff.
+- **Receiver mode is a checkbox, not a login.** Anyone can tick "I am a receiver". The
+  server only lets receivers change status or delete others' done orders, but it can't
+  prove who is a receiver.
+- **Deleting an order erases it from the database.** Back up `server/data/office.db` if
+  you need old records.
 - One receiver, on the office PC. Requests sent while it is off are announced when it
   starts, if they are less than 30 minutes old. Older ones only appear in history.

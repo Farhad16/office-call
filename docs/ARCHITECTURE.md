@@ -12,7 +12,7 @@
  └──────────────────┘                  └──────────────┬───────────────┘
                                                       │ Socket.IO
                                        ┌──────────────▼───────────────┐
-                                       │ Receiver page (/receiver)    │
+                                       │ Speaker page (/receiver)    │
                                        │ open in browser on same PC   │
                                        │ → Bengali text → speaker     │
                                        └──────────────────────────────┘
@@ -72,16 +72,26 @@ office-call/
 - After a rename, other devices still remember the old name. Signing in there with the
   old name creates a new, empty user. Sign in with the new name instead.
 
-### Staff mode
+### Receivers (staff) and senders
 
-- Ticking **I am staff** when signing in turns staff mode on for that name, stored as
-  `users.is_staff`. Signing in later without ticking it does **not** turn it off. Turn it
-  off with the checkbox on the name screen (click your name in the header).
-- Only staff can change request status. The **server** checks this
-  (`PATCH /api/requests/:id/status` returns `403` for non-staff), not only the UI.
-- **This is not real security.** Anyone can tick the box or type a staff member's name. It
-  only stops mistakes. Real protection would need a staff PIN or password checked by the
-  server.
+Anyone who sends a request is a **sender**. A **receiver** is a staff member who handles
+requests. (In code and the database this is `isStaff` / `users.is_staff`.)
+
+- Ticking **I am a receiver** when signing in turns it on for that name. Signing in later
+  without ticking it does **not** turn it off. To turn it off, click your name in the header
+  and untick it.
+- The **server** checks every rule, not only the UI:
+
+| Action                      | Sender                | Receiver          |
+| --------------------------- | --------------------- | ----------------- |
+| View dashboard              | ✅                    | ✅                |
+| Change status               | ❌ (`403`)            | ✅                |
+| Delete own order            | ✅ if Pending or Done | ✅ same as sender |
+| Delete someone else's order | ❌                    | ✅ only if Done   |
+
+- **Delete erases the order permanently.** It can't be undone.
+- **This is not real security.** Anyone can tick the box or type a receiver's name. It
+  only stops mistakes. Real protection would need a PIN or password checked by the server.
 
 ## Database schema (SQLite)
 
@@ -206,8 +216,12 @@ Socket.IO reconnects by itself after network drops. On reconnect the receiver se
   `409 This request is already done by Karim.`
 - Dashboards apply `request:new` / `request:updated` directly and reload after a
   reconnect. "Completed today" counts from the viewer's local midnight.
-- If staff marks a request done before the receiver has spoken it, the receiver drops it
-  from its queue ("Done before announced").
+- If a request is marked done or deleted before the speaker has said it, the speaker
+  drops it from its queue ("Done before announced" / "Deleted").
+- Bulk delete: tick cards, or **Select all I can delete**, then **Delete selected**. Only
+  cards the viewer may delete get a checkbox. The server deletes what is allowed, in one
+  transaction, and reports the rest. If an order moves to In Progress while it is ticked,
+  its checkbox disappears.
 
 ## Announcements
 

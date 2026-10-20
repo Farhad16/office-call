@@ -16,7 +16,7 @@ import {
 import { readStored, writeStored } from '../lib/storage';
 import styles from './ReceiverPage.module.css';
 
-type ItemState = 'waiting' | 'queued' | 'speaking' | 'announced' | 'skipped' | 'failed';
+type ItemState = 'waiting' | 'queued' | 'speaking' | 'announced' | 'skipped' | 'deleted' | 'failed';
 type HistoryItem = { request: OfficeRequest; state: ItemState; error?: string };
 
 type Settings = { language: VoicePreference; voiceURI: string; rate: number; repeat: boolean; chime: boolean };
@@ -36,6 +36,7 @@ const STATE_LABEL: Record<ItemState, string> = {
   speaking: 'Speaking…',
   announced: 'Announced',
   skipped: 'Done before announced',
+  deleted: 'Deleted',
   failed: 'Failed',
 };
 
@@ -196,14 +197,27 @@ export function ReceiverPage() {
     const onUpdated = (request: OfficeRequest) => {
       if (request.status === 'done' && queue.current?.remove(request.id)) upsert(request, { state: 'skipped' });
     };
+    // Deleted by the sender before it was spoken: don't announce it.
+    const onDeleted = ({ ids }: { ids: number[] }) => {
+      for (const id of ids) {
+        const waiting = queue.current?.remove(id);
+        setHistory((list) =>
+          list.map((h) =>
+            h.request.id === id && (waiting || h.state !== 'speaking') ? { ...h, state: 'deleted' } : h,
+          ),
+        );
+      }
+    };
     socket.on('connect', join);
     socket.on('request:new', onNew);
     socket.on('request:updated', onUpdated);
+    socket.on('request:deleted', onDeleted);
     if (socket.connected) join();
     return () => {
       socket.off('connect', join);
       socket.off('request:new', onNew);
       socket.off('request:updated', onUpdated);
+      socket.off('request:deleted', onDeleted);
     };
     // enqueue only touches refs and state setters, so it is safe to leave out.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -233,6 +247,7 @@ export function ReceiverPage() {
     const now = new Date().toISOString();
     enqueue({
       id: --testId,
+      userId: 0,
       userName: 'Farhad',
       type,
       selection: type === 'order' ? SAMPLE_ORDER : null,
@@ -291,7 +306,7 @@ export function ReceiverPage() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <h1>📢 Office Call · Receiver</h1>
+        <h1>📢 Office Call · Speaker</h1>
         <span className={styles.pill} data-ok={connected && started}>
           {!connected ? 'Disconnected, reconnecting…' : started ? 'Listening' : 'Not started'}
         </span>
@@ -305,7 +320,7 @@ export function ReceiverPage() {
 
       {!started ? (
         <section className={styles.card}>
-          <h2>Start the receiver</h2>
+          <h2>Start the speaker</h2>
           <p>Keep this page open on the office computer, with the speaker on. Click once to turn on sound.</p>
           {languagePicker}
           {voiceInfo}
@@ -315,7 +330,7 @@ export function ReceiverPage() {
             </p>
           )}
           <button className={styles.start} onClick={() => start()} disabled={!catalog}>
-            🔊 Start receiver
+            🔊 Start speaker
           </button>
         </section>
       ) : (

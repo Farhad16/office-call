@@ -68,8 +68,8 @@ export function NameEntry({ initialName = '', initialStaff = false, onSubmit, on
       <label className={styles.staff}>
         <input type="checkbox" checked={staff} onChange={(e) => setStaff(e.target.checked)} />
         <span>
-          I am staff
-          <small>Staff can update request status on the dashboard.</small>
+          I am a receiver
+          <small>Receivers handle requests: change status and delete done orders on the dashboard.</small>
         </span>
       </label>
       <div className={styles.actions}>

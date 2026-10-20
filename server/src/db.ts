@@ -6,6 +6,8 @@ import { DEFAULT_CATALOG } from '../../shared/catalog.js';
 import { summarizeSelection } from '../../shared/selection.js';
 import {
   NEXT_STATUSES,
+  canDelete,
+  type DeleteResponse,
   type OfficeRequest,
   type Preset,
   type RequestStatus,
@@ -242,6 +244,7 @@ type RequestRow = {
 function toRequest(row: RequestRow): OfficeRequest {
   return {
     id: row.id,
+    userId: row.user_id,
     userName: row.user_name,
     type: row.type,
     selection: row.selection ? (JSON.parse(row.selection) as Selection) : null,
@@ -402,4 +405,28 @@ export const setRequestStatus = db.transaction((id: number, to: RequestStatus, s
   const info = setStatusRow.run({ to, from: row.status, staff: staffName, id });
   if (info.changes === 0) throw new UserError('Someone else just updated this request. Try again.', 409);
   return getRequest(id)!;
+});
+
+const deleteRequestRow = db.prepare<[number]>('DELETE FROM requests WHERE id = ?');
+
+/**
+ * Permanently erases the requests `user` is allowed to delete (see canDelete) and reports
+ * the rest. One transaction, so a status change can't slip in between check and delete.
+ */
+export const deleteRequests = db.transaction((user: User, ids: number[]): DeleteResponse => {
+  const result: DeleteResponse = { deleted: [], skipped: [] };
+  for (const id of new Set(ids)) {
+    const row = getRequestById.get(id);
+    if (!row) {
+      result.skipped.push({ id, reason: 'Already deleted.' });
+    } else if (canDelete({ userId: row.user_id, status: row.status }, user)) {
+      deleteRequestRow.run(id);
+      result.deleted.push(id);
+    } else if (row.user_id === user.id) {
+      result.skipped.push({ id, reason: 'It is in progress. You can delete it once it is done.' });
+    } else {
+      result.skipped.push({ id, reason: 'You can only delete your own orders, or done orders as a receiver.' });
+    }
+  }
+  return result;
 });

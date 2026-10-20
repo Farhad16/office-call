@@ -25,15 +25,32 @@ type Props = {
   /** Only passed for staff; without it no status buttons are shown. */
   onChangeStatus?: (request: OfficeRequest, to: RequestStatus) => void;
   busy?: boolean;
+  /** Only passed when the viewer may delete this request. */
+  selection?: { selected: boolean; onToggle: () => void; onDelete: () => void };
 };
 
-export function RequestCard({ request, catalog, onChangeStatus, busy = false }: Props) {
+export function RequestCard({ request, catalog, onChangeStatus, busy = false, selection }: Props) {
   const details = request.selection ? describeSelection(request.selection, catalog) : null;
   const actions = onChangeStatus ? NEXT_STATUSES[request.status] : [];
+  const showFooter = actions.length > 0 || selection;
 
   return (
-    <article className={styles.card} data-status={request.status} aria-busy={busy || undefined}>
+    <article
+      className={styles.card}
+      data-status={request.status}
+      data-selected={selection?.selected || undefined}
+      aria-busy={busy || undefined}
+    >
       <header className={styles.head}>
+        {selection && (
+          <input
+            type="checkbox"
+            className={styles.select}
+            checked={selection.selected}
+            onChange={selection.onToggle}
+            aria-label={`Select ${request.userName}'s request from ${formatTime(request.createdAt)}`}
+          />
+        )}
         <h3>
           {request.userName} <span className={styles.time}>· {formatTime(request.createdAt)}</span>
         </h3>
@@ -68,8 +85,13 @@ export function RequestCard({ request, catalog, onChangeStatus, busy = false }: 
         </p>
       )}
 
-      {actions.length > 0 && (
+      {showFooter && (
         <div className={styles.actions}>
+          {selection && (
+            <button type="button" className={styles.delete} disabled={busy} onClick={selection.onDelete}>
+              Delete
+            </button>
+          )}
           {actions.map((to) => (
             <button
               key={to}

@@ -34,7 +34,7 @@ export const getJson = <T>(url: string) => request<T>('GET', url);
 export const postJson = <T>(url: string, body: unknown) => request<T>('POST', url, body);
 export const putJson = <T>(url: string, body: unknown) => request<T>('PUT', url, body);
 export const patchJson = <T>(url: string, body: unknown) => request<T>('PATCH', url, body);
-export const deleteJson = (url: string) => request<void>('DELETE', url);
+export const deleteJson = <T = void>(url: string, body?: unknown) => request<T>('DELETE', url, body);
 
 /** Message to show for any thrown error. */
 export function errorMessage(err: unknown): string {
