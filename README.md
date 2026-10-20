@@ -23,6 +23,12 @@ npm run dev
 - App: http://localhost:5173 (other devices: `http://<office-pc-ip>:5173`)
 - API: http://localhost:3000/api/health
 
+## Data
+
+- Database file: `server/data/office.db` (SQLite). Change with `DB_PATH=/path/to/file.db`.
+- Back up by copying the file while the server is stopped.
+- Add or change drinks/snacks in `shared/catalog.ts`, then rebuild and restart.
+
 ## Code checks
 
 ```bash

@@ -62,3 +62,16 @@
   color: var(--text);
   border: 1px solid var(--border);
 }
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.6;
+}
+.link {
+  display: block;
+  margin: 16px auto 0;
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}

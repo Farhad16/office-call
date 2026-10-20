@@ -38,14 +38,17 @@ office-call/
 │       ├── main.tsx, App.tsx
 │       ├── components/     # NameEntry, DrinkSection, SnackSection, ...
 │       ├── pages/          # Receiver page (phase 5)
-│       └── lib/            # identity, api client, announcement generator
+│       └── lib/            # identity, api client
+├── shared/                 # used by client AND server
+│   ├── catalog.ts          # default drinks/snacks/options
+│   ├── selection.ts        # validation + summary
+│   └── names.ts            # name rules
 └── server/                 # Express + Socket.IO + SQLite
     ├── data/               # office.db lives here (created at runtime)
     └── src/
         ├── index.ts        # HTTP server, static files, Socket.IO
         ├── db.ts           # schema + queries
-        ├── items.ts        # default drinks/snacks config
-        └── routes/         # users, presets, requests
+        └── routes/         # users + presets, requests
 ```
 
 ## Identity
@@ -61,10 +64,14 @@ office-call/
 - Anyone can type anyone's name and see or edit that person's presets.
 - Two people with the same name share one identity. Use a nickname to avoid this.
 - Never store anything private in presets or custom requests.
+- **Change name** renames you and keeps your presets. It fails if the new name is taken.
+- **Switch user** forgets the name on this device so someone else can sign in.
+- After a rename, other devices still remember the old name. Signing in there with the
+  old name creates a new, empty user. Sign in with the new name instead.
 
 ## Database schema (SQLite)
 
-Item definitions (drinks, snacks, options) live in a config file (`server/src/items.ts`),
+Item definitions (drinks, snacks, options) live in a config file (`shared/catalog.ts`),
 not the database. Adding an item means editing one file and restarting. A DB table can
 replace it later if an admin screen is needed.
 
@@ -117,17 +124,20 @@ Item IDs point into the config. Unknown IDs are rejected by the server.
 
 ## API
 
-| Method | Path                   | Purpose                                 |
-| ------ | ---------------------- | --------------------------------------- |
-| GET    | /api/health            | Server alive check                      |
-| GET    | /api/items             | Drinks, snacks and their options        |
-| POST   | /api/users             | Get-or-create user by name              |
-| GET    | /api/users/:id/presets | List this user's presets                |
-| POST   | /api/users/:id/presets | Create preset                           |
-| PUT    | /api/presets/:id       | Edit preset (must belong to user)       |
-| DELETE | /api/presets/:id       | Delete preset (must belong to user)     |
-| POST   | /api/requests          | Create order or call; returns saved row |
-| GET    | /api/requests/recent   | Recent history (receiver page)          |
+| Method | Path                           | Purpose                                    |
+| ------ | ------------------------------ | ------------------------------------------ |
+| GET    | /api/health                    | Server alive check                         |
+| GET    | /api/items                     | Drinks, snacks and their options           |
+| POST   | /api/users                     | Sign in: get-or-create user by name        |
+| PATCH  | /api/users/:userId             | Change display name (keeps presets)        |
+| GET    | /api/users/:userId/presets     | List this user's presets                   |
+| POST   | /api/users/:userId/presets     | Create preset                              |
+| PUT    | /api/users/:userId/presets/:id | Edit preset (only if it belongs to user)   |
+| DELETE | /api/users/:userId/presets/:id | Delete preset (only if it belongs to user) |
+| POST   | /api/requests                  | Create order or call; returns saved row    |
+| GET    | /api/requests/recent           | Recent history (receiver page)             |
+
+Errors always come back as `{ "ok": false, "error": "<message for the user>" }`.
 
 ## Socket.IO events
 

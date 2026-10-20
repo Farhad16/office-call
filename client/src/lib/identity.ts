@@ -1,20 +1,9 @@
 // Remembers the user's name on this device.
 // localStorage can throw (private mode, blocked storage), so every access is guarded.
 
-import { cleanText } from '../../../shared/selection.js';
+import { cleanName, validateName } from '../../../shared/names.js';
 
 const KEY = 'officeCall.userName';
-export const MAX_NAME_LENGTH = 40;
-
-/** Trim, collapse inner spaces, drop control characters. */
-export const cleanName = cleanText;
-
-/** Returns an error message, or null if the name is fine. */
-export function validateName(name: string): string | null {
-  if (name.length === 0) return 'Please enter your name.';
-  if (name.length > MAX_NAME_LENGTH) return `Name must be ${MAX_NAME_LENGTH} characters or fewer.`;
-  return null;
-}
 
 export function loadName(): string | null {
   try {

@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Catalog, Selection } from '../../../shared/types.js';
+import type { Catalog, Selection, User } from '../../../shared/types.js';
 import { emptySelection, summarizeSelection } from '../../../shared/selection.js';
 import { getJson } from '../lib/api';
 import { DrinkSection } from '../components/DrinkSection';
 import { SnackSection } from '../components/SnackSection';
 import { CustomSection } from '../components/CustomSection';
 import { RequestSummary } from '../components/RequestSummary';
+import { PresetBar } from '../components/PresetBar';
 import styles from './OrderPage.module.css';
 
 type Notice = { kind: 'success' | 'error' | 'info'; text: string } | null;
 
-export function OrderPage() {
+export function OrderPage({ user }: { user: User }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>(emptySelection);
@@ -61,6 +62,8 @@ export function OrderPage() {
           {notice.text}
         </p>
       )}
+
+      <PresetBar user={user} catalog={catalog} selection={selection} onLoad={setSelection} />
 
       <DrinkSection
         catalog={catalog}

@@ -138,3 +138,9 @@ export function summarizeSelection(sel: Selection, catalog: Catalog): string[] {
   if (custom) lines.push(`“${custom}”`);
   return lines;
 }
+
+/** True when two selections would produce the same request. */
+export function sameSelection(a: Selection, b: Selection): boolean {
+  const norm = (s: Selection) => JSON.stringify({ drinks: s.drinks, snacks: s.snacks, custom: cleanText(s.custom) });
+  return norm(a) === norm(b);
+}

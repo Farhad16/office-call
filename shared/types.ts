@@ -47,3 +47,15 @@ export type Selection = {
   snacks: SnackLine[];
   custom: string;
 };
+
+export type User = { id: number; name: string };
+
+export type Preset = {
+  id: number;
+  name: string;
+  selection: Selection;
+  updatedAt: string;
+};
+
+/** Error body returned by every failing API call. */
+export type ApiErrorBody = { ok: false; error: string };
