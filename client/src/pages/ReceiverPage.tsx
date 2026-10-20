@@ -1,0 +1,330 @@
+import { useEffect, useRef, useState } from 'react';
+import type { Catalog, OfficeRequest } from '../../../shared/types.js';
+import { buildAnnouncement, type AnnounceLanguage } from '../../../shared/announce.js';
+import { errorMessage, getJson } from '../lib/api';
+import { socket } from '../lib/socket';
+import { AnnouncementQueue } from '../lib/announcementQueue';
+import { isBengali, loadVoices, pickDefaultVoice, playChime, speak, speechSupported } from '../lib/speech';
+import { readStored, writeStored } from '../lib/storage';
+import styles from './ReceiverPage.module.css';
+
+type ItemState = 'waiting' | 'queued' | 'speaking' | 'announced' | 'failed';
+type HistoryItem = { request: OfficeRequest; state: ItemState; error?: string };
+
+type Settings = { voiceURI: string; rate: number; repeat: boolean; chime: boolean };
+const SETTINGS_KEY = 'officeCall.receiverSettings';
+const DEFAULT_SETTINGS: Settings = { voiceURI: '', rate: 0.95, repeat: false, chime: true };
+const HISTORY_LIMIT = 50;
+
+const STATE_LABEL: Record<ItemState, string> = {
+  waiting: 'Waiting',
+  queued: 'In queue',
+  speaking: 'Speaking…',
+  announced: 'Announced',
+  failed: 'Failed',
+};
+
+const SAMPLE_ORDER: OfficeRequest['selection'] = {
+  drinks: [{ itemId: 'tea', qty: 1, options: { sugar: 'less', milk: false, ginger: true, lemon: true } }],
+  snacks: [
+    { itemId: 'chanachur-makha', qty: 1 },
+    { itemId: 'biscuit', qty: 2 },
+  ],
+  custom: '',
+};
+
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const timeOf = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+let testId = 0; // test announcements use negative ids and are never sent to the server
+
+export function ReceiverPage() {
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[] | null>(null);
+  const [settings, setSettings] = useState<Settings>(() => readStored(SETTINGS_KEY, DEFAULT_SETTINGS));
+  const [started, setStarted] = useState(false);
+  const [connected, setConnected] = useState(socket.connected);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const voice = voices?.find((v) => v.voiceURI === settings.voiceURI) ?? pickDefaultVoice(voices ?? []);
+  const lang: AnnounceLanguage = isBengali(voice) ? 'bn' : 'en';
+  const hasBengali = !!voices?.some((v) => isBengali(v));
+
+  // The queue runs outside React renders, so it reads the latest values from this ref.
+  const latest = useRef({ catalog, voice, lang, settings });
+  useEffect(() => {
+    latest.current = { catalog, voice, lang, settings };
+  });
+  const audioCtx = useRef<AudioContext | null>(null);
+  const queue = useRef<AnnouncementQueue<OfficeRequest> | null>(null);
+
+  useEffect(() => {
+    getJson<Catalog>('/api/items')
+      .then(setCatalog)
+      .catch((err) => setError(errorMessage(err)));
+    loadVoices().then(setVoices);
+  }, []);
+
+  useEffect(() => writeStored(SETTINGS_KEY, settings), [settings]);
+
+  useEffect(() => {
+    const on = () => setConnected(true);
+    const off = () => setConnected(false);
+    socket.on('connect', on);
+    socket.on('disconnect', off);
+    return () => {
+      socket.off('connect', on);
+      socket.off('disconnect', off);
+    };
+  }, []);
+
+  /** Adds or updates a history row (newest first). */
+  function upsert(request: OfficeRequest, patch: Partial<HistoryItem>) {
+    setHistory((list) => {
+      const index = list.findIndex((h) => h.request.id === request.id);
+      if (index === -1) {
+        const item: HistoryItem = { request, state: 'queued', ...patch };
+        return [item, ...list].slice(0, HISTORY_LIMIT);
+      }
+      const next = [...list];
+      next[index] = { ...next[index], ...patch };
+      return next;
+    });
+  }
+
+  async function announce(request: OfficeRequest) {
+    const { catalog, voice, lang, settings } = latest.current;
+    if (!catalog) throw new Error('Menu not loaded');
+    const text = buildAnnouncement(request, catalog, lang);
+    upsert(request, { state: 'speaking', error: undefined });
+    try {
+      if (settings.chime && audioCtx.current) await playChime(audioCtx.current);
+      await speak(text, voice, settings.rate);
+      if (settings.repeat) {
+        await pause(700);
+        await speak(text, voice, settings.rate);
+      }
+      upsert(request, { state: 'announced' });
+      if (request.id > 0) socket.emit('request:announced', { id: request.id });
+    } catch (err) {
+      upsert(request, { state: 'failed', error: errorMessage(err) });
+    }
+    await pause(400); // small gap between announcements
+  }
+
+  function enqueue(request: OfficeRequest) {
+    const q = queue.current;
+    if (!q || q.has(request.id)) return;
+    upsert(request, { state: 'queued' });
+    q.add(request);
+  }
+
+  // Must run from a click: browsers only allow sound after the user interacts with the page.
+  async function start() {
+    setError(null);
+    try {
+      const Ctx =
+        window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      audioCtx.current = new Ctx();
+      await audioCtx.current.resume();
+    } catch {
+      audioCtx.current = null; // chime off, speech may still work
+    }
+    queue.current = new AnnouncementQueue(announce);
+    try {
+      const recent = await getJson<OfficeRequest[]>('/api/requests/recent?limit=30');
+      setHistory(
+        recent.map((request) => ({ request, state: request.status === 'announced' ? 'announced' : 'waiting' })),
+      );
+    } catch (err) {
+      setError(`Could not load history: ${errorMessage(err)}`);
+    }
+    setStarted(true);
+  }
+
+  // Once started: register as receiver (again after every reconnect) and listen for requests.
+  useEffect(() => {
+    if (!started) return;
+    const join = () => socket.emit('receiver:join', (pending) => pending.forEach(enqueue));
+    const onNew = (request: OfficeRequest) => enqueue(request);
+    socket.on('connect', join);
+    socket.on('request:new', onNew);
+    if (socket.connected) join();
+    return () => {
+      socket.off('connect', join);
+      socket.off('request:new', onNew);
+    };
+    // enqueue only touches refs and state setters, so it is safe to leave out.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [started]);
+
+  // Ask the OS not to sleep the screen while the receiver runs (works on localhost/HTTPS).
+  useEffect(() => {
+    if (!started || !('wakeLock' in navigator)) return;
+    let lock: WakeLockSentinel | null = null;
+    const request = () => {
+      if (document.visibilityState === 'visible') {
+        navigator.wakeLock
+          .request('screen')
+          .then((l) => (lock = l))
+          .catch(() => {});
+      }
+    };
+    request();
+    document.addEventListener('visibilitychange', request);
+    return () => {
+      document.removeEventListener('visibilitychange', request);
+      lock?.release().catch(() => {});
+    };
+  }, [started]);
+
+  function test(type: 'order' | 'call') {
+    enqueue({
+      id: --testId,
+      userName: 'Farhad',
+      type,
+      selection: type === 'order' ? SAMPLE_ORDER : null,
+      status: 'received',
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  const textOf = (r: OfficeRequest) => (catalog ? buildAnnouncement(r, catalog, lang) : '…');
+  const speaking = history.find((h) => h.state === 'speaking');
+  const queued = history.filter((h) => h.state === 'queued').length;
+  const sortedVoices = [...(voices ?? [])].sort((a, b) => Number(isBengali(b)) - Number(isBengali(a)));
+
+  const voiceInfo = !speechSupported ? (
+    <p className={styles.bad}>This browser cannot speak. Use Google Chrome.</p>
+  ) : voices === null ? (
+    <p className={styles.muted}>Checking voices…</p>
+  ) : voices.length === 0 ? (
+    <p className={styles.bad}>
+      No voices installed. On Linux run <code>sudo apt install speech-dispatcher espeak-ng</code> and restart Chrome.
+    </p>
+  ) : hasBengali ? (
+    <p className={styles.good}>
+      Bengali voice found: {voice?.name} ({voice?.lang})
+    </p>
+  ) : (
+    <p className={styles.warn}>
+      No Bengali voice found. Announcing in English with “{voice?.name}”. See README → Voice to add Bengali.
+    </p>
+  );
+
+  return (
+    <main className={styles.page}>
+      <header className={styles.header}>
+        <h1>📢 Office Call · Receiver</h1>
+        <span className={styles.pill} data-ok={connected && started}>
+          {!connected ? 'Disconnected, reconnecting…' : started ? 'Listening' : 'Not started'}
+        </span>
+      </header>
+
+      {error && (
+        <p className={styles.bad} role="alert">
+          {error}
+        </p>
+      )}
+
+      {!started ? (
+        <section className={styles.card}>
+          <h2>Start the receiver</h2>
+          <p>Keep this page open on the office computer, with the speaker on. Click once to turn on sound.</p>
+          {voiceInfo}
+          <button className={styles.start} onClick={start} disabled={!catalog}>
+            🔊 Start receiver
+          </button>
+        </section>
+      ) : (
+        <>
+          <section className={styles.now} aria-live="polite">
+            {speaking ? (
+              <>
+                <p className={styles.nowLabel}>Now speaking</p>
+                <p className={styles.nowText}>{textOf(speaking.request)}</p>
+              </>
+            ) : (
+              <p className={styles.nowLabel}>Waiting for requests…</p>
+            )}
+            {queued > 0 && <p className={styles.muted}>{queued} more in queue</p>}
+          </section>
+
+          <section className={styles.card}>
+            {voiceInfo}
+            <div className={styles.controls}>
+              <button onClick={() => test('order')}>Test order</button>
+              <button onClick={() => test('call')}>Test call</button>
+            </div>
+            <details>
+              <summary>Voice settings</summary>
+              <label className={styles.field}>
+                Voice
+                <select
+                  value={settings.voiceURI}
+                  onChange={(e) => setSettings({ ...settings, voiceURI: e.target.value })}
+                >
+                  <option value="">Automatic ({pickDefaultVoice(voices ?? [])?.name ?? 'none'})</option>
+                  {sortedVoices.map((v) => (
+                    <option key={v.voiceURI} value={v.voiceURI}>
+                      {v.name} ({v.lang})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className={styles.muted}>Bengali voices speak Bengali text. Any other voice speaks English text.</p>
+              <label className={styles.field}>
+                Speed {settings.rate.toFixed(2)}
+                <input
+                  type="range"
+                  min={0.6}
+                  max={1.4}
+                  step={0.05}
+                  value={settings.rate}
+                  onChange={(e) => setSettings({ ...settings, rate: Number(e.target.value) })}
+                />
+              </label>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={settings.chime}
+                  onChange={(e) => setSettings({ ...settings, chime: e.target.checked })}
+                />
+                Play a chime first
+              </label>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={settings.repeat}
+                  onChange={(e) => setSettings({ ...settings, repeat: e.target.checked })}
+                />
+                Say every announcement twice
+              </label>
+            </details>
+          </section>
+        </>
+      )}
+
+      <section className={styles.card}>
+        <h2>Recent requests</h2>
+        {history.length === 0 ? (
+          <p className={styles.muted}>No requests yet.</p>
+        ) : (
+          <ul className={styles.history}>
+            {history.map(({ request, state, error }) => (
+              <li key={request.id} data-state={state}>
+                <span className={styles.time}>{timeOf(request.createdAt)}</span>
+                <span className={styles.text}>
+                  {textOf(request)}
+                  {request.id < 0 && <em> (test)</em>}
+                  {error && <span className={styles.bad}> {error}</span>}
+                </span>
+                <span className={styles.badge}>{STATE_LABEL[state]}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </main>
+  );
+}

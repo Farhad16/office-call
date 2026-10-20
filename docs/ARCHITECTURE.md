@@ -37,11 +37,12 @@ office-call/
 │   └── src/
 │       ├── main.tsx, App.tsx
 │       ├── components/     # NameEntry, DrinkSection, SnackSection, ...
-│       ├── pages/          # Receiver page (phase 5)
-│       └── lib/            # identity, api client
+│       ├── pages/          # OrderPage, ReceiverPage (/receiver)
+│       └── lib/            # api, socket, speech, announcement queue
 ├── shared/                 # used by client AND server
 │   ├── catalog.ts          # default drinks/snacks/options
 │   ├── selection.ts        # validation + summary
+│   ├── announce.ts         # Bengali/English sentence builder
 │   └── names.ts            # name rules
 └── server/                 # Express + Socket.IO + SQLite
     ├── data/               # office.db lives here (created at runtime)
@@ -165,6 +166,19 @@ Socket.IO reconnects by itself after network drops. On reconnect the receiver se
 - When a receiver joins, it gets requests not yet announced from the **last 30 minutes**.
   Older ones are too stale to announce, but still appear in history.
 - Open **one** receiver tab only. Every receiver tab announces every request.
+
+## Announcements
+
+`shared/announce.ts` builds the sentence from the request data and the catalog's `bn`
+words. Nothing is hard-coded per combination:
+
+- Drinks: `<name> <count> <drink> চেয়েছে, <choice words>, <toggles> দিয়ে।`
+- Snacks after drinks: `সাথে <a>, <b> আর <c>।`. Snacks only: `<name> <list> চেয়েছে।`
+- Custom text: `আরও বলেছে: <text>।`, or `<name> বলেছে: <text>।` when it is the only thing.
+- Call: `<name> ডাকছে।`
+
+A new option only needs `bn` text in the catalog. The receiver plays a chime, then speaks.
+Requests wait in a queue and are spoken one at a time; the same id is never spoken twice.
 
 ## Implementation plan
 
