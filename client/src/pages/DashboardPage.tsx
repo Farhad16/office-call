@@ -1,4 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
+import {
+  CircleCheck,
+  Hourglass,
+  Inbox,
+  LayoutGrid,
+  List,
+  ListChecks,
+  LoaderCircle,
+  RefreshCw,
+  Search,
+  Trash2,
+} from 'lucide-react';
 import { canDelete } from '../../../shared/types.js';
 import type {
   ActiveResponse,
@@ -13,10 +27,30 @@ import { deleteJson, errorMessage, getJson, patchJson } from '../lib/api';
 import { socket } from '../lib/socket';
 import { startOfToday } from '../lib/format';
 import { RequestCard, STATUS_LABEL } from '../components/RequestCard';
+import { Button } from '../components/ui/Button';
+import { useConfirm } from '../components/ui/Confirm';
+import { Segmented } from '../components/ui/Segmented';
 import styles from './DashboardPage.module.css';
 
 type Tab = 'active' | 'history';
-type Toast = { kind: 'success' | 'error'; text: string } | null;
+type View = 'list' | 'cards';
+
+// Remembered per device. localStorage can throw (blocked storage), so it is guarded.
+const VIEW_KEY = 'officeCall.dashboardView';
+function loadView(): View {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'cards' ? 'cards' : 'list';
+  } catch {
+    return 'list';
+  }
+}
+function saveView(view: View) {
+  try {
+    localStorage.setItem(VIEW_KEY, view);
+  } catch {
+    // ignore
+  }
+}
 const HISTORY_PAGE = 50;
 
 const byCreated = (a: OfficeRequest, b: OfficeRequest) => a.createdAt.localeCompare(b.createdAt) || a.id - b.id;
@@ -33,6 +67,7 @@ function upsert(list: OfficeRequest[], request: OfficeRequest): OfficeRequest[] 
 
 export function DashboardPage({ user }: { user: User }) {
   const [tab, setTab] = useState<Tab>('active');
+  const [view, setView] = useState<View>(loadView);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
 
   const [active, setActive] = useState<OfficeRequest[] | null>(null);
@@ -49,7 +84,9 @@ export function DashboardPage({ user }: { user: User }) {
   const [busy, setBusy] = useState<Set<number>>(new Set());
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [deleting, setDeleting] = useState(false);
-  const [toast, setToast] = useState<Toast>(null);
+  const confirm = useConfirm();
+  const [activeListRef] = useAutoAnimate<HTMLOListElement>();
+  const [historyListRef] = useAutoAnimate<HTMLOListElement>();
 
   // Ids already counted in "completed today", so a repeated event never counts twice.
   const counted = useRef(new Set<number>());
@@ -149,13 +186,6 @@ export function DashboardPage({ user }: { user: User }) {
     };
   }, [apply, loadActive, loadHistory, removeLocal, tab]);
 
-  // Hide the toast after a few seconds.
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), toast.kind === 'error' ? 6000 : 2500);
-    return () => clearTimeout(timer);
-  }, [toast]);
-
   async function changeStatus(request: OfficeRequest, to: RequestStatus) {
     if (busy.has(request.id)) return; // one update per request at a time
     setBusy((s) => new Set(s).add(request.id));
@@ -165,9 +195,9 @@ export function DashboardPage({ user }: { user: User }) {
         status: to,
       });
       apply(updated);
-      setToast({ kind: 'success', text: `${request.userName}'s request: ${STATUS_LABEL[to]} ✓` });
+      toast.success(`${STATUS_LABEL[to]}`, { description: `${request.userName}'s request` });
     } catch (err) {
-      setToast({ kind: 'error', text: errorMessage(err) });
+      toast.error(errorMessage(err));
       loadActive(); // someone else may have changed it; show the real state
     } finally {
       setBusy((s) => {
@@ -182,16 +212,24 @@ export function DashboardPage({ user }: { user: User }) {
   async function remove(ids: number[]) {
     if (deleting || ids.length === 0) return;
     const what = ids.length === 1 ? 'this order' : `${ids.length} orders`;
-    if (!window.confirm(`Delete ${what} permanently? This cannot be undone.`)) return;
+    const ok = await confirm({
+      title: `Delete ${what}?`,
+      description: 'They are erased permanently. This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     setDeleting(true);
     try {
       const res = await deleteJson<DeleteResponse>('/api/requests', { userId: user.id, ids });
       removeLocal(res.deleted);
-      const done = res.deleted.length ? `Deleted ${res.deleted.length}.` : '';
-      const notDone = res.skipped.length ? ` ${res.skipped.length} not deleted: ${res.skipped[0].reason}` : '';
-      setToast({ kind: res.skipped.length ? 'error' : 'success', text: `${done}${notDone}`.trim() });
+      if (res.deleted.length)
+        toast.success(`Deleted ${res.deleted.length} ${res.deleted.length === 1 ? 'order' : 'orders'}`);
+      if (res.skipped.length) {
+        toast.warning(`${res.skipped.length} not deleted`, { description: res.skipped[0].reason });
+      }
     } catch (err) {
-      setToast({ kind: 'error', text: `Not deleted: ${errorMessage(err)}` });
+      toast.error('Not deleted', { description: errorMessage(err) });
     } finally {
       setDeleting(false);
     }
@@ -225,7 +263,7 @@ export function DashboardPage({ user }: { user: User }) {
       : undefined;
 
   const toolbar = deletable.length > 0 && (
-    <div className={styles.toolbar}>
+    <div className={styles.toolbar} data-active={chosen.length > 0 || undefined}>
       <label>
         <input
           type="checkbox"
@@ -235,74 +273,125 @@ export function DashboardPage({ user }: { user: User }) {
           }}
           onChange={() => setSelected(allChosen ? new Set() : new Set(deletable.map((r) => r.id)))}
         />
-        Select all I can delete ({deletable.length})
+        {chosen.length > 0 ? `${chosen.length} selected` : `Select all I can delete (${deletable.length})`}
       </label>
-      <button type="button" disabled={chosen.length === 0 || deleting} onClick={() => remove(chosen)}>
-        {deleting ? 'Deleting…' : `Delete selected (${chosen.length})`}
-      </button>
+      <Button
+        size="sm"
+        variant={chosen.length ? 'danger' : 'dangerGhost'}
+        icon={<Trash2 size={14} />}
+        disabled={chosen.length === 0}
+        loading={deleting}
+        onClick={() => remove(chosen)}
+      >
+        Delete selected ({chosen.length})
+      </Button>
     </div>
   );
+
+  const stats = [
+    { label: 'Active requests', value: active?.length, icon: <ListChecks size={18} />, tone: 'accent' },
+    { label: 'In progress', value: active ? inProgress : undefined, icon: <Hourglass size={18} />, tone: 'info' },
+    {
+      label: 'Completed today',
+      value: active ? completedToday : undefined,
+      icon: <CircleCheck size={18} />,
+      tone: 'success',
+    },
+  ];
 
   return (
     <section className={styles.page} aria-label="Dashboard">
       <div className={styles.cards}>
-        <div className={styles.stat}>
-          <span>{active?.length ?? '–'}</span>
-          Active requests
-        </div>
-        <div className={styles.stat}>
-          <span>{active ? inProgress : '–'}</span>
-          In progress
-        </div>
-        <div className={styles.stat}>
-          <span>{active ? completedToday : '–'}</span>
-          Completed today
-        </div>
-      </div>
-
-      <div className={styles.tabs} role="tablist" aria-label="Dashboard views">
-        {(['active', 'history'] as const).map((t) => (
-          <button
-            key={t}
-            role="tab"
-            id={`tab-${t}`}
-            aria-selected={tab === t}
-            aria-controls={`panel-${t}`}
-            onClick={() => switchTab(t)}
-          >
-            {t === 'active' ? `Active Queue${active ? ` (${active.length})` : ''}` : 'History'}
-          </button>
+        {stats.map((s) => (
+          <div key={s.label} className={styles.stat} data-tone={s.tone}>
+            <span className={styles.statIcon} aria-hidden>
+              {s.icon}
+            </span>
+            <span className={styles.statValue}>{s.value ?? '–'}</span>
+            <span className={styles.statLabel}>{s.label}</span>
+          </div>
         ))}
       </div>
 
-      {!user.isStaff && (
-        <p className={styles.muted}>
-          You can delete your own orders unless they are in progress. Receivers update status (tick “I am a receiver”
-          when signing in).
-        </p>
-      )}
+      <div className={styles.bar}>
+        <div className={styles.tabs} role="tablist" aria-label="Dashboard views">
+          {(['active', 'history'] as const).map((t) => (
+            <button
+              key={t}
+              role="tab"
+              id={`tab-${t}`}
+              aria-selected={tab === t}
+              aria-controls={`panel-${t}`}
+              onClick={() => switchTab(t)}
+            >
+              {t === 'active' ? 'Active Queue' : 'History'}
+              {t === 'active' && active && <span className={styles.tabCount}>{active.length}</span>}
+            </button>
+          ))}
+        </div>
+        <div className={styles.barRight}>
+          {tab === 'history' && (
+            <label className={styles.search}>
+              <Search size={16} aria-hidden />
+              <input
+                type="search"
+                placeholder="Search name or item…"
+                aria-label="Search history"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </label>
+          )}
+          <Segmented
+            name="view"
+            label="View"
+            size="sm"
+            value={view}
+            onChange={(v) => {
+              setView(v);
+              saveView(v);
+            }}
+            options={[
+              {
+                value: 'list',
+                label: (
+                  <>
+                    <List size={15} aria-hidden /> List
+                  </>
+                ),
+              },
+              {
+                value: 'cards',
+                label: (
+                  <>
+                    <LayoutGrid size={15} aria-hidden /> Cards
+                  </>
+                ),
+              },
+            ]}
+          />
+        </div>
+      </div>
 
-      {toast && (
-        <p className={styles.toast} data-kind={toast.kind} role={toast.kind === 'error' ? 'alert' : 'status'}>
-          {toast.text}
+      {!user.isStaff && (
+        <p className={styles.note}>
+          You can delete your own orders unless they are in progress. Receivers update status (turn on “I am a receiver”
+          in your profile).
         </p>
       )}
 
       {tab === 'active' ? (
         <div id="panel-active" role="tabpanel" aria-labelledby="tab-active">
           {activeError ? (
-            <div className={styles.state}>
-              <p className={styles.error}>{activeError}</p>
-              <button onClick={loadActive}>Try again</button>
-            </div>
+            <ErrorState message={activeError} onRetry={loadActive} />
           ) : !active || !catalog ? (
-            <p className={styles.state}>Loading…</p>
+            <Loading />
           ) : active.length === 0 ? (
-            <p className={styles.state}>No active requests. All caught up ☕</p>
+            <EmptyState title="All caught up" text="No active requests right now ☕" />
           ) : (
             <>
               {toolbar}
-              <ol className={styles.list}>
+              <ol ref={activeListRef} className={view === 'list' ? styles.rows : styles.list}>
                 {active.map((r) => (
                   <li key={r.id}>
                     <RequestCard
@@ -311,6 +400,7 @@ export function DashboardPage({ user }: { user: User }) {
                       onChangeStatus={onChangeStatus}
                       busy={busy.has(r.id) || deleting}
                       selection={selectionFor(r)}
+                      layout={view === 'list' ? 'row' : 'card'}
                     />
                   </li>
                 ))}
@@ -320,49 +410,80 @@ export function DashboardPage({ user }: { user: User }) {
         </div>
       ) : (
         <div id="panel-history" role="tabpanel" aria-labelledby="tab-history">
-          <input
-            type="search"
-            className={styles.search}
-            placeholder="Search by name or item, e.g. Farhad, tea, biscuits"
-            aria-label="Search history"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
           {historyError ? (
-            <div className={styles.state}>
-              <p className={styles.error}>{historyError}</p>
-              <button onClick={() => loadHistory(query, 0)}>Try again</button>
-            </div>
+            <ErrorState message={historyError} onRetry={() => loadHistory(query, 0)} />
           ) : !history || !catalog ? (
-            <p className={styles.state}>Loading…</p>
+            <Loading />
           ) : history.length === 0 ? (
-            <p className={styles.state}>{query ? `Nothing matches “${query}”.` : 'No completed requests yet.'}</p>
+            query ? (
+              <EmptyState title="No matches" text={`Nothing matches “${query}”.`} />
+            ) : (
+              <EmptyState title="No history yet" text="Completed requests show up here." />
+            )
           ) : (
             <>
               {toolbar}
-              <ol className={styles.list}>
+              <ol ref={historyListRef} className={view === 'list' ? styles.rows : styles.list}>
                 {history.map((r) => (
                   <li key={r.id}>
-                    <RequestCard request={r} catalog={catalog} busy={deleting} selection={selectionFor(r)} />
+                    <RequestCard
+                      request={r}
+                      catalog={catalog}
+                      busy={deleting}
+                      selection={selectionFor(r)}
+                      layout={view === 'list' ? 'row' : 'card'}
+                    />
                   </li>
                 ))}
               </ol>
               {hasMore && (
-                <button
+                <Button
                   className={styles.more}
+                  loading={historyLoading}
                   onClick={() => {
                     setHistoryLoading(true);
                     loadHistory(query, history.length);
                   }}
-                  disabled={historyLoading}
                 >
-                  {historyLoading ? 'Loading…' : 'Load more'}
-                </button>
+                  Load more
+                </Button>
               )}
             </>
           )}
         </div>
       )}
     </section>
+  );
+}
+
+function Loading() {
+  return (
+    <div className={styles.state}>
+      <LoaderCircle className="spin" size={24} aria-hidden />
+      <p>Loading…</p>
+    </div>
+  );
+}
+
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className={styles.state}>
+      <p className={styles.error}>{message}</p>
+      <Button icon={<RefreshCw size={15} />} onClick={onRetry}>
+        Try again
+      </Button>
+    </div>
+  );
+}
+
+function EmptyState({ title, text }: { title: string; text: string }) {
+  return (
+    <div className={styles.state}>
+      <span className={styles.emptyIcon} aria-hidden>
+        <Inbox size={26} />
+      </span>
+      <p className={styles.emptyTitle}>{title}</p>
+      <p>{text}</p>
+    </div>
   );
 }

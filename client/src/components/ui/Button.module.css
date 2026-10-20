@@ -1,0 +1,90 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    transform 0.1s var(--ease),
+    box-shadow 0.15s;
+  user-select: none;
+}
+.button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.button[data-block] {
+  width: 100%;
+}
+.button svg {
+  flex: none;
+}
+
+.button[data-size='sm'] {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 0.85rem;
+  border-radius: var(--r-sm);
+}
+.button[data-size='md'] {
+  height: 40px;
+  padding: 0 16px;
+  font-size: 0.93rem;
+}
+.button[data-size='lg'] {
+  height: 54px;
+  padding: 0 22px;
+  font-size: 1.05rem;
+  border-radius: var(--r-lg);
+}
+
+.button[data-variant='primary'] {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / 0.12);
+}
+.button[data-variant='primary']:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.button[data-variant='secondary'] {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+.button[data-variant='secondary']:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.button[data-variant='ghost'] {
+  background: transparent;
+  color: var(--muted);
+}
+.button[data-variant='ghost']:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.button[data-variant='danger'] {
+  background: var(--danger);
+  color: #fff;
+}
+.button[data-variant='danger']:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 85%, #000);
+}
+.button[data-variant='dangerGhost'] {
+  background: transparent;
+  color: var(--danger);
+}
+.button[data-variant='dangerGhost']:hover:not(:disabled) {
+  background: var(--danger-soft);
+}

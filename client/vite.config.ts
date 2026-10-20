@@ -29,7 +29,7 @@ export default defineConfig({
       workbox: {
         // Cache only the app files. API calls, live updates and the CA download always
         // go to the server, so the app never shows stale data or a fake "sent".
-        globPatterns: ['**/*.{js,css,html,svg,png}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//, /^\/socket\.io\//, /^\/ca\.pem$/],
         runtimeCaching: [],

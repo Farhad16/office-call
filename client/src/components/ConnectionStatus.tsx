@@ -6,7 +6,7 @@ export function ConnectionStatus({ connected, receiverOnline }: Connection) {
     ? (['bad', 'Not connected to the office server. Reconnecting…'] as const)
     : receiverOnline
       ? (['good', 'Speaker online'] as const)
-      : (['warn', 'Speaker offline: requests are saved but not announced yet'] as const);
+      : (['warn', 'Speaker offline. Requests are saved and announced later'] as const);
   return (
     <p className={styles.status} data-tone={tone} role="status">
       <span className={styles.dot} aria-hidden />

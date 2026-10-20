@@ -1,6 +1,9 @@
+import { Coffee } from 'lucide-react';
 import type { Catalog, DrinkLine, OptionValue } from '../../../shared/types.js';
 import { findItem, isOptionVisible, itemOptions, newDrinkLine, visibleValues } from '../../../shared/selection.js';
 import { QtyStepper } from './QtyStepper';
+import { Segmented } from './ui/Segmented';
+import { Button } from './ui/Button';
 import styles from './sections.module.css';
 
 type Props = {
@@ -17,14 +20,24 @@ export function DrinkSection({ catalog, value, onChange }: Props) {
     onChange({ ...value, options: visibleValues(selected, { ...value.options, [id]: v }, catalog) });
   }
 
+  const options =
+    value && selected ? itemOptions(selected, catalog).filter((o) => isOptionVisible(o, value.options)) : [];
+  const choices = options.filter((o) => o.kind === 'choice');
+  const toggles = options.filter((o) => o.kind === 'toggle');
+
   return (
     <section className={styles.section} aria-labelledby="drinks-title">
       <div className={styles.sectionHead}>
-        <h2 id="drinks-title">Drinks</h2>
+        <h2 id="drinks-title">
+          <span className={styles.sectionIcon} aria-hidden>
+            <Coffee size={17} />
+          </span>
+          Drinks
+        </h2>
         {value && (
-          <button type="button" className={styles.clear} onClick={() => onChange(null)}>
+          <Button variant="ghost" size="sm" onClick={() => onChange(null)}>
             Clear
-          </button>
+          </Button>
         )}
       </div>
 
@@ -50,39 +63,41 @@ export function DrinkSection({ catalog, value, onChange }: Props) {
 
       {value && selected && (
         <div className={styles.options}>
-          {itemOptions(selected, catalog)
-            .filter((option) => isOptionVisible(option, value.options))
-            .map((option) =>
-              option.kind === 'choice' ? (
-                <fieldset key={option.id} className={styles.fieldset}>
-                  <legend>{option.label}</legend>
-                  <div className={styles.segmented}>
-                    {option.choices.map((choice) => (
-                      <label key={choice.id} className={styles.chip}>
-                        <input
-                          type="radio"
-                          name={option.id}
-                          checked={value.options[option.id] === choice.id}
-                          onChange={() => setOption(option.id, choice.id)}
-                        />
-                        <span>{choice.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-              ) : (
-                <label key={option.id} className={styles.chip}>
-                  <input
-                    type="checkbox"
-                    checked={value.options[option.id] === true}
-                    onChange={(e) => setOption(option.id, e.target.checked)}
+          {choices.map(
+            (option) =>
+              option.kind === 'choice' && (
+                <div key={option.id} className={styles.optionRow}>
+                  <span className={styles.optionLabel}>{option.label}</span>
+                  <Segmented
+                    name={option.id}
+                    label={option.label}
+                    size="sm"
+                    value={value.options[option.id] as string}
+                    onChange={(v) => setOption(option.id, v)}
+                    options={option.choices.map((c) => ({ value: c.id, label: c.label.replace(/ sugar$/i, '') }))}
                   />
-                  <span>{option.label}</span>
-                </label>
+                </div>
               ),
-            )}
-          <div className={styles.qtyRow}>
-            <span>Cups</span>
+          )}
+          {toggles.length > 0 && (
+            <div className={styles.optionRow}>
+              <span className={styles.optionLabel}>Add</span>
+              <div className={styles.chips}>
+                {toggles.map((option) => (
+                  <label key={option.id} className={styles.chip}>
+                    <input
+                      type="checkbox"
+                      checked={value.options[option.id] === true}
+                      onChange={(e) => setOption(option.id, e.target.checked)}
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className={styles.optionRow}>
+            <span className={styles.optionLabel}>Cups</span>
             <QtyStepper
               value={value.qty}
               min={1}

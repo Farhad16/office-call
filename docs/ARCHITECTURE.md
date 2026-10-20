@@ -54,6 +54,16 @@ office-call/
         └── routes/         # users + presets, requests
 ```
 
+## UI
+
+- CSS Modules plus design tokens (colors, radius, shadows) on `:root` in
+  `client/src/index.css`, with a dark theme via `prefers-color-scheme`.
+- Shared pieces in `client/src/components/ui/`: `Button`, `Badge`, `Switch`,
+  `Segmented`, `Confirm` (styled dialog via `useConfirm()`).
+- Libraries: `sonner` (toasts), `lucide-react` (icons), `@formkit/auto-animate`
+  (list animations), `@fontsource-variable/inter` + `@fontsource/noto-sans-bengali`
+  (fonts bundled, so they work offline and on Linux PCs without Bengali fonts).
+
 ## Identity
 
 - A user is identified by their **name only**. The server stores a normalised key

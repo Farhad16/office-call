@@ -1,47 +1,57 @@
-import styles from './sections.module.css';
-
-export type Notice = { kind: 'success' | 'error' | 'info'; text: string };
+import { Check, ReceiptText, Send, X } from 'lucide-react';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
+import { Button } from './ui/Button';
+import styles from './RequestSummary.module.css';
 
 type Props = {
   lines: string[];
-  notice: Notice | null; // result of the last send or call; shown here so it is always on screen
-  sendLabel: string;
+  sending: boolean;
+  sent: boolean; // short "Sent" state after success
   disabled: boolean;
   onSend: () => void;
   onClearAll: () => void;
 };
 
-export function RequestSummary({ lines, notice, sendLabel, disabled, onSend, onClearAll }: Props) {
+/** Phones: a bar stuck to the bottom. Desktop: a panel that follows you on the right. */
+export function RequestSummary({ lines, sending, sent, disabled, onSend, onClearAll }: Props) {
   const empty = lines.length === 0;
+  const [listRef] = useAutoAnimate<HTMLUListElement>();
+
   return (
-    <div className={styles.summaryBar}>
-      <div className={styles.summary} aria-live="polite">
-        {empty ? (
-          <p className={styles.muted}>Nothing selected yet.</p>
-        ) : (
-          <>
-            <div className={styles.sectionHead}>
-              <strong>Your request</strong>
-              <button type="button" className={styles.clear} onClick={onClearAll}>
-                Clear all
-              </button>
-            </div>
-            <ul>
-              {lines.map((line, i) => (
-                <li key={i}>{line}</li>
-              ))}
-            </ul>
-          </>
+    <aside className={styles.panel} aria-label="Your request">
+      <div className={styles.head}>
+        <h2>
+          <ReceiptText size={18} aria-hidden /> Your request
+          {!empty && <span className={styles.count}>{lines.length}</span>}
+        </h2>
+        {!empty && (
+          <Button variant="ghost" size="sm" icon={<X size={14} />} onClick={onClearAll}>
+            Clear all
+          </Button>
         )}
       </div>
-      {notice && (
-        <p className={styles.notice} data-kind={notice.kind} role={notice.kind === 'error' ? 'alert' : 'status'}>
-          {notice.text}
-        </p>
-      )}
-      <button type="button" className={styles.send} onClick={onSend} disabled={empty || disabled}>
-        {sendLabel}
-      </button>
-    </div>
+      <div className={styles.body} aria-live="polite">
+        {empty ? (
+          <p className={styles.empty}>Pick a drink, snacks or write a request.</p>
+        ) : (
+          <ul ref={listRef} className={styles.lines}>
+            {lines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <Button
+        variant="primary"
+        size="lg"
+        block
+        onClick={onSend}
+        disabled={empty || disabled}
+        loading={sending}
+        icon={sent ? <Check size={18} /> : <Send size={18} />}
+      >
+        {sending ? 'Sending…' : sent ? 'Sent' : 'Send Request'}
+      </Button>
+    </aside>
   );
 }

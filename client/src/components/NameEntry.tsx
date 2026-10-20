@@ -1,5 +1,8 @@
 import { useState, type FormEvent } from 'react';
+import { ArrowRight, Coffee, LogOut } from 'lucide-react';
 import { cleanName, validateName, MAX_NAME_LENGTH } from '../../../shared/names.js';
+import { Button } from './ui/Button';
+import { Switch } from './ui/Switch';
 import styles from './NameEntry.module.css';
 
 type Props = {
@@ -35,13 +38,22 @@ export function NameEntry({ initialName = '', initialStaff = false, onSubmit, on
 
   return (
     <form className={styles.card} onSubmit={handleSubmit} noValidate>
-      <h1 className={styles.title}>☕ Office Call</h1>
+      <span className={styles.logo} aria-hidden>
+        <Coffee size={26} strokeWidth={2.2} />
+      </span>
+      <h1 className={styles.title}>{renaming ? 'Your profile' : 'Welcome to Office Call'}</h1>
+      <p className={styles.subtitle}>
+        {renaming
+          ? 'Your presets move with you if you change your name.'
+          : 'Tea, coffee, snacks or help — one tap away.'}
+      </p>
+
       <label htmlFor="name" className={styles.label}>
-        {renaming ? 'Change your name' : 'What is your name?'}
+        {renaming ? 'Your name' : 'What is your name?'}
       </label>
       <input
         id="name"
-        className={styles.input}
+        className="input"
         value={value}
         onChange={(e) => {
           setValue(e.target.value);
@@ -60,32 +72,40 @@ export function NameEntry({ initialName = '', initialStaff = false, onSubmit, on
         </p>
       ) : (
         <p id="name-hint" className={styles.hint}>
-          {renaming
-            ? 'Your presets move to the new name.'
-            : 'This name is spoken on the office speaker. No password needed.'}
+          Spoken on the office speaker. No password needed.
         </p>
       )}
-      <label className={styles.staff}>
-        <input type="checkbox" checked={staff} onChange={(e) => setStaff(e.target.checked)} />
-        <span>
-          I am a receiver
-          <small>Receivers handle requests: change status and delete done orders on the dashboard.</small>
-        </span>
-      </label>
+
+      <div className={styles.switch}>
+        <Switch
+          checked={staff}
+          onChange={setStaff}
+          label="I am a receiver"
+          hint="Receivers handle requests: change status and delete done orders."
+        />
+      </div>
+
       <div className={styles.actions}>
         {onCancel && (
-          <button type="button" className={styles.secondary} onClick={onCancel} disabled={busy}>
+          <Button onClick={onCancel} disabled={busy}>
             Cancel
-          </button>
+          </Button>
         )}
-        <button type="submit" className={styles.primary} disabled={busy}>
-          {busy ? 'Please wait…' : renaming ? 'Save' : 'Continue'}
-        </button>
+        <Button type="submit" variant="primary" loading={busy} icon={!renaming && <ArrowRight size={16} />}>
+          {renaming ? 'Save' : 'Continue'}
+        </Button>
       </div>
       {onSwitchUser && (
-        <button type="button" className={styles.link} onClick={onSwitchUser} disabled={busy}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={styles.switchUser}
+          icon={<LogOut size={14} />}
+          onClick={onSwitchUser}
+          disabled={busy}
+        >
           Not you? Switch user
-        </button>
+        </Button>
       )}
     </form>
   );

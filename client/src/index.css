@@ -1,50 +1,156 @@
+/* Design tokens: every component uses these, so the whole app changes together. */
 :root {
-  --bg: #faf7f2;
+  --font: 'Inter Variable', 'Noto Sans Bengali', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --bg: #f6f5f2;
   --surface: #ffffff;
-  --text: #2b2118;
-  --muted: #7a6d62;
-  --border: #e6ddd2;
-  --accent: #7a4a1e;
+  --surface-2: #f1efea;
+  --text: #1c1917;
+  --muted: #78716c;
+  --border: #e7e4df;
+  --border-strong: #d6d1ca;
+
+  --accent: #b45309;
+  --accent-hover: #92400e;
   --on-accent: #ffffff;
-  --danger: #b3261e;
-  --success: #2e7d32;
-  --shadow: 0 2px 12px rgba(60, 40, 20, 0.08);
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    'Noto Sans Bengali',
-    sans-serif;
-  color-scheme: light dark;
+  --accent-soft: #fdf3e3;
+
+  --success: #15803d;
+  --success-soft: #e8f6ed;
+  --warning: #b45309;
+  --warning-soft: #fdf1dc;
+  --danger: #dc2626;
+  --danger-soft: #fdecec;
+  --info: #2563eb;
+  --info-soft: #e8efff;
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+
+  --shadow-sm: 0 1px 2px rgb(28 25 23 / 0.05);
+  --shadow-md: 0 1px 2px rgb(28 25 23 / 0.04), 0 6px 20px -6px rgb(28 25 23 / 0.12);
+  --shadow-lg: 0 2px 6px rgb(28 25 23 / 0.06), 0 18px 48px -12px rgb(28 25 23 / 0.22);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --header-h: 60px;
+
+  /* old names still used in a few places */
+  --shadow: var(--shadow-md);
+
+  font-family: var(--font);
+  color-scheme: light;
 }
+
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1c1814;
-    --surface: #26211c;
-    --text: #f2ebe3;
-    --muted: #b3a597;
-    --border: #3d352d;
-    --accent: #d9a066;
-    --on-accent: #1c1814;
-    --danger: #f2867e;
-    --success: #81c784;
-    --shadow: none;
+    --bg: #0e0d0c;
+    --surface: #191715;
+    --surface-2: #221f1c;
+    --text: #f5f4f2;
+    --muted: #a39d97;
+    --border: #2c2825;
+    --border-strong: #3b3632;
+
+    --accent: #f59e0b;
+    --accent-hover: #fbbf24;
+    --on-accent: #1c1917;
+    --accent-soft: #2b2012;
+
+    --success: #4ade80;
+    --success-soft: #14261a;
+    --warning: #fbbf24;
+    --warning-soft: #2a2110;
+    --danger: #f87171;
+    --danger-soft: #2c1615;
+    --info: #60a5fa;
+    --info-soft: #14203a;
+
+    --shadow-sm: none;
+    --shadow-md: 0 0 0 1px rgb(255 255 255 / 0.02), 0 8px 24px -8px rgb(0 0 0 / 0.6);
+    --shadow-lg: 0 0 0 1px rgb(255 255 255 / 0.03), 0 24px 60px -12px rgb(0 0 0 / 0.7);
+    color-scheme: dark;
   }
 }
+
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
 body {
   margin: 0;
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
   line-height: 1.5;
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
 }
 button,
 input,
 textarea,
 select {
   font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+h1,
+h2,
+h3 {
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+::selection {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+/* Shared form controls */
+.input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.input::placeholder {
+  color: color-mix(in srgb, var(--muted) 80%, transparent);
+}
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

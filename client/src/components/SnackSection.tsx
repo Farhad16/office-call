@@ -1,5 +1,7 @@
+import { Cookie } from 'lucide-react';
 import type { Catalog, SnackLine } from '../../../shared/types.js';
 import { QtyStepper } from './QtyStepper';
+import { Button } from './ui/Button';
 import styles from './sections.module.css';
 
 type Props = {
@@ -24,22 +26,27 @@ export function SnackSection({ catalog, value, onChange }: Props) {
   return (
     <section className={styles.section} aria-labelledby="snacks-title">
       <div className={styles.sectionHead}>
-        <h2 id="snacks-title">Snacks</h2>
+        <h2 id="snacks-title">
+          <span className={styles.sectionIcon} aria-hidden>
+            <Cookie size={17} />
+          </span>
+          Snacks
+        </h2>
         {value.length > 0 && (
-          <button type="button" className={styles.clear} onClick={() => onChange([])}>
+          <Button variant="ghost" size="sm" onClick={() => onChange([])}>
             Clear
-          </button>
+          </Button>
         )}
       </div>
-      <ul className={styles.list}>
+      <ul className={styles.snacks}>
         {catalog.snacks.map((item) => {
           const qty = qtyOf(item.id);
           return (
-            <li key={item.id} className={styles.listRow} data-active={qty > 0}>
-              <span>
-                <span className={styles.emoji} aria-hidden>
+            <li key={item.id} className={styles.snack} data-active={qty > 0 || undefined}>
+              <span className={styles.snackName}>
+                <span className={styles.snackEmoji} aria-hidden>
                   {item.emoji}
-                </span>{' '}
+                </span>
                 {item.label}
               </span>
               <QtyStepper

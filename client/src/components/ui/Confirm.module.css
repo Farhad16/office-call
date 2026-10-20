@@ -1,0 +1,49 @@
+.dialog {
+  width: min(420px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+}
+.dialog[open] {
+  animation: pop 0.18s var(--ease);
+}
+.dialog::backdrop {
+  background: rgb(15 13 12 / 0.45);
+  backdrop-filter: blur(3px);
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+.body {
+  padding: 24px;
+}
+.body h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.body p {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+.icon {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 14px;
+  border-radius: 50%;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 22px;
+}

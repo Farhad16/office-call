@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { Coffee, LayoutDashboard, LoaderCircle, RefreshCw, ShoppingBag, WifiOff } from 'lucide-react';
 import type { User } from '../../shared/types.js';
 import { NameEntry } from './components/NameEntry';
 import { OrderPage } from './pages/OrderPage';
@@ -6,6 +8,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { useRoute } from './lib/route';
 import { clearName, loadName, saveName } from './lib/identity';
 import { errorMessage, patchJson, postJson } from './lib/api';
+import { Button } from './components/ui/Button';
 import styles from './App.module.css';
 
 type Session =
@@ -62,7 +65,7 @@ export default function App() {
 
   if (session.status === 'signed-out') {
     return (
-      <main className={styles.page}>
+      <main className={styles.auth}>
         <NameEntry onSubmit={signIn} />
       </main>
     );
@@ -70,19 +73,30 @@ export default function App() {
 
   if (session.status !== 'ready') {
     return (
-      <main className={styles.page}>
-        <div className={styles.center}>
+      <main className={styles.auth}>
+        <div className={styles.stateCard}>
           {session.status === 'loading' ? (
-            <p>Connecting to the office server…</p>
+            <>
+              <LoaderCircle className="spin" size={28} aria-hidden />
+              <p>Connecting to the office server…</p>
+            </>
           ) : (
             <>
-              <p className={styles.error}>{session.error}</p>
-              <button className={styles.button} onClick={() => setSession({ status: 'loading', name: session.name })}>
+              <span className={styles.stateIcon} aria-hidden>
+                <WifiOff size={24} />
+              </span>
+              <h2>Can’t reach the server</h2>
+              <p className={styles.muted}>{session.error}</p>
+              <Button
+                variant="primary"
+                icon={<RefreshCw size={16} />}
+                onClick={() => setSession({ status: 'loading', name: session.name })}
+              >
                 Try again
-              </button>
-              <button className={styles.link} onClick={switchUser}>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={switchUser}>
                 Use a different name
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -94,7 +108,7 @@ export default function App() {
 
   if (editingName) {
     return (
-      <main className={styles.page}>
+      <main className={styles.auth}>
         <NameEntry
           initialName={user.name}
           initialStaff={user.isStaff}
@@ -104,6 +118,7 @@ export default function App() {
               saveName(updated.name);
               setSession({ status: 'ready', user: updated });
               setEditingName(false);
+              toast.success('Profile saved');
               return null;
             } catch (err) {
               return errorMessage(err);
@@ -116,36 +131,58 @@ export default function App() {
     );
   }
 
+  const initials = user.name
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
   return (
-    <main className={styles.page}>
+    <>
       <header className={styles.header}>
-        <span className={styles.brand}>☕ Office Call</span>
-        <button className={styles.nameButton} onClick={() => setEditingName(true)} title="Change name">
-          {user.name}
-          {user.isStaff && <span className={styles.staffBadge}>Receiver</span>} ✎
-        </button>
+        <div className={styles.headerInner}>
+          <span className={styles.brand}>
+            <span className={styles.logo} aria-hidden>
+              <Coffee size={18} strokeWidth={2.4} />
+            </span>
+            Office Call
+          </span>
+          <nav className={styles.tabs} aria-label="Pages">
+            {(['order', 'dashboard'] as const).map((r) => (
+              <a
+                key={r}
+                href={r === 'order' ? '/' : '/dashboard'}
+                aria-current={route === r ? 'page' : undefined}
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate(r);
+                }}
+              >
+                {r === 'order' ? <ShoppingBag size={16} aria-hidden /> : <LayoutDashboard size={16} aria-hidden />}
+                <span>{r === 'order' ? 'Order' : 'Dashboard'}</span>
+              </a>
+            ))}
+          </nav>
+          <button className={styles.user} onClick={() => setEditingName(true)} title="Profile: change name or role">
+            <span className={styles.avatar} aria-hidden>
+              {initials}
+            </span>
+            <span className={styles.userText}>
+              <span className={styles.userName}>{user.name}</span>
+              <span className={styles.userRole}>{user.isStaff ? 'Receiver' : 'Sender'}</span>
+            </span>
+          </button>
+        </div>
       </header>
-      <nav className={styles.tabs} aria-label="Pages">
-        {(['order', 'dashboard'] as const).map((r) => (
-          <a
-            key={r}
-            href={r === 'order' ? '/' : '/dashboard'}
-            aria-current={route === r ? 'page' : undefined}
-            onClick={(e) => {
-              e.preventDefault();
-              navigate(r);
-            }}
-          >
-            {r === 'order' ? 'Order' : 'Dashboard'}
-          </a>
-        ))}
-      </nav>
-      {/* The order page stays mounted (hidden) so a half-finished selection survives switching tabs.
-          key: a different user gets a fresh page (their own presets). */}
-      <div hidden={route !== 'order'}>
-        <OrderPage key={user.id} user={user} />
-      </div>
-      {route === 'dashboard' && <DashboardPage user={user} />}
-    </main>
+      <main className={styles.page}>
+        {/* The order page stays mounted (hidden) so a half-finished selection survives switching tabs.
+            key: a different user gets a fresh page (their own presets). */}
+        <div hidden={route !== 'order'}>
+          <OrderPage key={user.id} user={user} />
+        </div>
+        {route === 'dashboard' && <DashboardPage user={user} />}
+      </main>
+    </>
   );
 }

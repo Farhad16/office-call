@@ -1,0 +1,53 @@
+.group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.option {
+  position: relative;
+  cursor: pointer;
+}
+.option input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.option span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--r-sm);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--muted);
+  transition:
+    background 0.15s,
+    color 0.15s,
+    box-shadow 0.15s;
+}
+.group[data-size='sm'] .option span {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 0.85rem;
+}
+.option:hover span {
+  color: var(--text);
+}
+.option input:checked + span {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow:
+    var(--shadow-sm),
+    0 0 0 1px var(--border);
+}
+.option input:focus-visible + span {
+  box-shadow: var(--ring);
+}

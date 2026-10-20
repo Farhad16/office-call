@@ -1,4 +1,6 @@
+import { MessageSquareText } from 'lucide-react';
 import { CUSTOM_MAX_LENGTH } from '../../../shared/selection.js';
+import { Button } from './ui/Button';
 import styles from './sections.module.css';
 
 type Props = {
@@ -10,15 +12,21 @@ export function CustomSection({ value, onChange }: Props) {
   return (
     <section className={styles.section} aria-labelledby="custom-title">
       <div className={styles.sectionHead}>
-        <h2 id="custom-title">Custom request</h2>
+        <h2 id="custom-title">
+          <span className={styles.sectionIcon} aria-hidden>
+            <MessageSquareText size={17} />
+          </span>
+          <label htmlFor="custom-text">Custom request</label>
+        </h2>
         {value && (
-          <button type="button" className={styles.clear} onClick={() => onChange('')}>
+          <Button variant="ghost" size="sm" onClick={() => onChange('')}>
             Clear
-          </button>
+          </Button>
         )}
       </div>
       <textarea
-        className={styles.textarea}
+        id="custom-text"
+        className={`input ${styles.textarea}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         maxLength={CUSTOM_MAX_LENGTH}

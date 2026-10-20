@@ -19,6 +19,7 @@ npm start                          # prints the addresses for phones
   - Senders can delete their own orders unless they are in progress.
   - Tick **I am a receiver** when signing in to change status and delete done orders.
   - Tick several cards to delete them together.
+  - Switch between **List** (default) and **Cards** view; the choice is remembered per device.
 
 For start-at-boot, HTTPS and installing the app on phones, follow [docs/DEPLOY.md](docs/DEPLOY.md).
 

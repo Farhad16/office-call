@@ -1,4 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
+import {
+  BellRing,
+  ChevronDown,
+  CircleCheck,
+  ExternalLink,
+  History,
+  LayoutDashboard,
+  LoaderCircle,
+  Megaphone,
+  Play,
+  Settings2,
+  TriangleAlert,
+  Volume2,
+  Wifi,
+  WifiOff,
+} from 'lucide-react';
 import type { Catalog, OfficeRequest } from '../../../shared/types.js';
 import { buildAnnouncement, type AnnounceLanguage } from '../../../shared/announce.js';
 import { errorMessage, getJson } from '../lib/api';
@@ -14,6 +31,10 @@ import {
   type VoicePreference,
 } from '../lib/speech';
 import { readStored, writeStored } from '../lib/storage';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { Segmented } from '../components/ui/Segmented';
+import { Switch } from '../components/ui/Switch';
 import styles from './ReceiverPage.module.css';
 
 type ItemState = 'waiting' | 'queued' | 'speaking' | 'announced' | 'skipped' | 'deleted' | 'failed';
@@ -40,6 +61,16 @@ const STATE_LABEL: Record<ItemState, string> = {
   failed: 'Failed',
 };
 
+const STATE_TONE = {
+  waiting: 'neutral',
+  queued: 'info',
+  speaking: 'accent',
+  announced: 'success',
+  skipped: 'neutral',
+  deleted: 'neutral',
+  failed: 'danger',
+} as const;
+
 const SAMPLE_ORDER: OfficeRequest['selection'] = {
   drinks: [{ itemId: 'tea', qty: 1, options: { sugar: 'less', milk: false, ginger: true, lemon: true } }],
   snacks: [
@@ -63,6 +94,7 @@ export function ReceiverPage() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [autoBlocked, setAutoBlocked] = useState(false);
+  const [historyRef] = useAutoAnimate<HTMLUListElement>();
 
   // A voice picked by hand wins; otherwise the best voice for the chosen language.
   const autoVoice = pickVoice(voices ?? [], settings.language);
@@ -166,7 +198,12 @@ export function ReceiverPage() {
     queue.current = new AnnouncementQueue(announce);
     try {
       const recent = await getJson<OfficeRequest[]>('/api/requests/recent?limit=30');
-      setHistory(recent.map((request) => ({ request, state: request.announced ? 'announced' : 'waiting' })));
+      setHistory(
+        recent.map((request) => ({
+          request,
+          state: request.announced ? 'announced' : request.status === 'done' ? 'skipped' : 'waiting',
+        })),
+      );
     } catch (err) {
       setError(`Could not load history: ${errorMessage(err)}`);
     }
@@ -266,169 +303,220 @@ export function ReceiverPage() {
   const sortedVoices = [...(voices ?? [])].sort((a, b) => Number(isBengali(b)) - Number(isBengali(a)));
 
   const languagePicker = (
-    <fieldset className={styles.language}>
-      <legend>Announcement language</legend>
-      {LANGUAGES.map((l) => (
-        <label key={l.id} className={styles.langChip}>
-          <input
-            type="radio"
-            name="language"
-            checked={settings.language === l.id}
-            // Changing language goes back to the automatic voice for that language.
-            onChange={() => setSettings({ ...settings, language: l.id, voiceURI: '' })}
-          />
-          <span>{l.label}</span>
-        </label>
-      ))}
-    </fieldset>
+    <div className={styles.field}>
+      <span className={styles.fieldLabel}>Announcement language</span>
+      <Segmented
+        name="language"
+        label="Announcement language"
+        value={settings.language}
+        // Changing language goes back to the automatic voice for that language.
+        onChange={(language) => setSettings({ ...settings, language, voiceURI: '' })}
+        options={LANGUAGES.map((l) => ({ value: l.id, label: l.label }))}
+      />
+    </div>
   );
 
-  const voiceInfo = !speechSupported ? (
-    <p className={styles.bad}>This browser cannot speak. Use Google Chrome.</p>
-  ) : voices === null ? (
-    <p className={styles.muted}>Checking voices…</p>
-  ) : voices.length === 0 ? (
-    <p className={styles.bad}>
-      No voices installed. On Linux run <code>sudo apt install speech-dispatcher espeak-ng</code> and restart Chrome.
+  const callout = (tone: 'good' | 'warn' | 'bad' | 'muted', content: ReactNode) => (
+    <p className={styles.callout} data-tone={tone}>
+      {tone === 'good' ? (
+        <CircleCheck size={16} aria-hidden />
+      ) : tone === 'muted' ? (
+        <LoaderCircle size={16} className="spin" aria-hidden />
+      ) : (
+        <TriangleAlert size={16} aria-hidden />
+      )}
+      <span>{content}</span>
     </p>
-  ) : lang === 'bn' && !isBengali(voice) ? (
-    <p className={styles.bad}>
-      বাংলা is selected, but “{voice?.name}” cannot speak Bengali. Install a Bengali voice (README → Voice) or choose
-      English.
-    </p>
-  ) : (
-    <p className={lang === 'en' && settings.language === 'auto' && !hasBengali ? styles.warn : styles.good}>
-      Speaking {lang === 'bn' ? 'বাংলা' : 'English'} with “{voice?.name}” ({voice?.lang})
-      {lang === 'en' && settings.language === 'auto' && !hasBengali && ': no Bengali voice found. See README → Voice.'}
-    </p>
+  );
+
+  const voiceInfo = !speechSupported
+    ? callout('bad', 'This browser cannot speak. Use Google Chrome.')
+    : voices === null
+      ? callout('muted', 'Checking voices…')
+      : voices.length === 0
+        ? callout(
+            'bad',
+            <>
+              No voices installed. On Linux run <code>sudo apt install speech-dispatcher espeak-ng</code> and restart
+              Chrome.
+            </>,
+          )
+        : lang === 'bn' && !isBengali(voice)
+          ? callout(
+              'bad',
+              `বাংলা is selected, but “${voice?.name}” cannot speak Bengali. Install a Bengali voice (README → Voice) or choose English.`,
+            )
+          : lang === 'en' && settings.language === 'auto' && !hasBengali
+            ? callout('warn', `Speaking English with “${voice?.name}”: no Bengali voice found. See README → Voice.`)
+            : callout('good', `Speaking ${lang === 'bn' ? 'বাংলা' : 'English'} with “${voice?.name}” (${voice?.lang})`);
+
+  const statusPill = (
+    <span className={styles.pill} data-ok={connected && started} data-bad={!connected || undefined}>
+      {connected ? <Wifi size={14} aria-hidden /> : <WifiOff size={14} aria-hidden />}
+      {!connected ? 'Disconnected, reconnecting…' : started ? 'Listening' : 'Not started'}
+    </span>
   );
 
   return (
-    <main className={styles.page}>
+    <div className={styles.shell}>
       <header className={styles.header}>
-        <h1>📢 Office Call · Speaker</h1>
-        <span className={styles.headerRight}>
-          {/* New tab, so this speaker tab keeps running. */}
-          <a href="/dashboard" target="_blank" rel="noopener" className={styles.dashLink}>
-            Open dashboard ↗
-          </a>
-          <span className={styles.pill} data-ok={connected && started}>
-            {!connected ? 'Disconnected, reconnecting…' : started ? 'Listening' : 'Not started'}
+        <div className={styles.headerInner}>
+          <span className={styles.brand}>
+            <span className={styles.logo} aria-hidden>
+              <Megaphone size={17} strokeWidth={2.4} />
+            </span>
+            Office Call · Speaker
           </span>
-        </span>
+          <span className={styles.headerRight}>
+            {statusPill}
+            {/* New tab, so this speaker tab keeps running. */}
+            <a href="/dashboard" target="_blank" rel="noopener" className={styles.dashLink}>
+              <LayoutDashboard size={15} aria-hidden /> Open dashboard <ExternalLink size={13} aria-hidden />
+            </a>
+          </span>
+        </div>
       </header>
 
-      {error && (
-        <p className={styles.bad} role="alert">
-          {error}
-        </p>
-      )}
+      <main className={styles.page}>
+        {error && callout('bad', error)}
 
-      {!started ? (
-        <section className={styles.card}>
-          <h2>Start the speaker</h2>
-          <p>Keep this page open on the office computer, with the speaker on. Click once to turn on sound.</p>
-          {languagePicker}
-          {voiceInfo}
-          {autoBlocked && (
-            <p className={styles.warn}>
-              The browser blocked automatic sound. Click Start once (or see docs/DEPLOY.md to allow it).
+        {!started ? (
+          <section className={styles.startCard}>
+            <span className={styles.startIcon} aria-hidden>
+              <Volume2 size={30} />
+            </span>
+            <h1>Start the speaker</h1>
+            <p className={styles.muted}>
+              Keep this page open on the office computer with the speaker on. Click once to turn on sound.
             </p>
-          )}
-          <button className={styles.start} onClick={() => start()} disabled={!catalog}>
-            🔊 Start speaker
-          </button>
-        </section>
-      ) : (
-        <>
-          <section className={styles.now} aria-live="polite">
-            {speaking ? (
-              <>
-                <p className={styles.nowLabel}>Now speaking</p>
-                <p className={styles.nowText}>{textOf(speaking.request)}</p>
-              </>
-            ) : (
-              <p className={styles.nowLabel}>Waiting for requests…</p>
-            )}
-            {queued > 0 && <p className={styles.muted}>{queued} more in queue</p>}
-          </section>
-
-          <section className={styles.card}>
             {languagePicker}
             {voiceInfo}
-            <div className={styles.controls}>
-              <button onClick={() => test('order')}>Test order</button>
-              <button onClick={() => test('call')}>Test call</button>
-            </div>
-            <details>
-              <summary>Voice settings</summary>
-              <label className={styles.field}>
-                Voice
-                <select
-                  value={settings.voiceURI}
-                  onChange={(e) => setSettings({ ...settings, voiceURI: e.target.value })}
-                >
-                  <option value="">Automatic ({autoVoice?.name ?? 'none'})</option>
-                  {sortedVoices.map((v) => (
-                    <option key={v.voiceURI} value={v.voiceURI}>
-                      {v.name} ({v.lang})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p className={styles.muted}>Pick a voice that matches the announcement language.</p>
-              <label className={styles.field}>
-                Speed {settings.rate.toFixed(2)}
-                <input
-                  type="range"
-                  min={0.6}
-                  max={1.4}
-                  step={0.05}
-                  value={settings.rate}
-                  onChange={(e) => setSettings({ ...settings, rate: Number(e.target.value) })}
-                />
-              </label>
-              <label className={styles.check}>
-                <input
-                  type="checkbox"
-                  checked={settings.chime}
-                  onChange={(e) => setSettings({ ...settings, chime: e.target.checked })}
-                />
-                Play a chime first
-              </label>
-              <label className={styles.check}>
-                <input
-                  type="checkbox"
-                  checked={settings.repeat}
-                  onChange={(e) => setSettings({ ...settings, repeat: e.target.checked })}
-                />
-                Say every announcement twice
-              </label>
-            </details>
+            {autoBlocked &&
+              callout(
+                'warn',
+                'The browser blocked automatic sound. Click Start once (or see docs/DEPLOY.md to allow it).',
+              )}
+            <Button
+              variant="primary"
+              size="lg"
+              block
+              icon={<Volume2 size={18} />}
+              onClick={() => start()}
+              disabled={!catalog}
+            >
+              Start speaker
+            </Button>
           </section>
-        </>
-      )}
-
-      <section className={styles.card}>
-        <h2>Recent requests</h2>
-        {history.length === 0 ? (
-          <p className={styles.muted}>No requests yet.</p>
         ) : (
-          <ul className={styles.history}>
-            {history.map(({ request, state, error }) => (
-              <li key={request.id} data-state={state}>
-                <span className={styles.time}>{timeOf(request.createdAt)}</span>
-                <span className={styles.text}>
-                  {textOf(request)}
-                  {request.id < 0 && <em> (test)</em>}
-                  {error && <span className={styles.bad}> {error}</span>}
-                </span>
-                <span className={styles.badge}>{STATE_LABEL[state]}</span>
-              </li>
-            ))}
-          </ul>
+          <div className={styles.grid}>
+            <div className={styles.column}>
+              <section className={styles.now} data-speaking={!!speaking || undefined} aria-live="polite">
+                <div className={styles.wave} aria-hidden>
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                {speaking ? (
+                  <>
+                    <p className={styles.nowLabel}>Now speaking</p>
+                    <p className={styles.nowText}>{textOf(speaking.request)}</p>
+                  </>
+                ) : (
+                  <p className={styles.nowLabel}>Waiting for requests…</p>
+                )}
+                {queued > 0 && <Badge tone="info">{queued} more in queue</Badge>}
+              </section>
+
+              <section className={styles.card}>
+                <h2>
+                  <Settings2 size={17} aria-hidden /> Voice
+                </h2>
+                {languagePicker}
+                {voiceInfo}
+                <div className={styles.controls}>
+                  <Button icon={<Play size={15} />} onClick={() => test('order')}>
+                    Test order
+                  </Button>
+                  <Button icon={<BellRing size={15} />} onClick={() => test('call')}>
+                    Test call
+                  </Button>
+                </div>
+                <details className={styles.details}>
+                  <summary>
+                    More voice settings <ChevronDown size={16} aria-hidden />
+                  </summary>
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>Voice</span>
+                    <select
+                      className="input"
+                      value={settings.voiceURI}
+                      onChange={(e) => setSettings({ ...settings, voiceURI: e.target.value })}
+                    >
+                      <option value="">Automatic ({autoVoice?.name ?? 'none'})</option>
+                      {sortedVoices.map((v) => (
+                        <option key={v.voiceURI} value={v.voiceURI}>
+                          {v.name} ({v.lang})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>
+                      Speed <span className={styles.muted}>{settings.rate.toFixed(2)}×</span>
+                    </span>
+                    <input
+                      type="range"
+                      className={styles.range}
+                      min={0.6}
+                      max={1.4}
+                      step={0.05}
+                      value={settings.rate}
+                      onChange={(e) => setSettings({ ...settings, rate: Number(e.target.value) })}
+                    />
+                  </label>
+                  <div className={styles.switches}>
+                    <Switch
+                      checked={settings.chime}
+                      onChange={(chime) => setSettings({ ...settings, chime })}
+                      label="Play a chime first"
+                    />
+                    <Switch
+                      checked={settings.repeat}
+                      onChange={(repeat) => setSettings({ ...settings, repeat })}
+                      label="Say every announcement twice"
+                    />
+                  </div>
+                </details>
+              </section>
+            </div>
+
+            <section className={`${styles.card} ${styles.historyCard}`}>
+              <h2>
+                <History size={17} aria-hidden /> Recent requests
+              </h2>
+              {history.length === 0 ? (
+                <p className={styles.muted}>No requests yet.</p>
+              ) : (
+                <ul ref={historyRef} className={styles.history}>
+                  {history.map(({ request, state, error }) => (
+                    <li key={request.id} data-state={state}>
+                      <span className={styles.time}>{timeOf(request.createdAt)}</span>
+                      <span className={styles.text}>
+                        {textOf(request)}
+                        {request.id < 0 && <em className={styles.muted}> (test)</em>}
+                        {error && <span className={styles.errorText}> {error}</span>}
+                      </span>
+                      <Badge tone={STATE_TONE[state]}>{STATE_LABEL[state]}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
         )}
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }
