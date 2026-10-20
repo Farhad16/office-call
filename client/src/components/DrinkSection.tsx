@@ -22,7 +22,9 @@ export function DrinkSection({ catalog, value, onChange }: Props) {
       <div className={styles.sectionHead}>
         <h2 id="drinks-title">Drinks</h2>
         {value && (
-          <button type="button" className={styles.clear} onClick={() => onChange(null)}>Clear</button>
+          <button type="button" className={styles.clear} onClick={() => onChange(null)}>
+            Clear
+          </button>
         )}
       </div>
 
@@ -37,7 +39,9 @@ export function DrinkSection({ catalog, value, onChange }: Props) {
               aria-pressed={active}
               onClick={() => onChange(active ? null : newDrinkLine(item, catalog))}
             >
-              <span className={styles.emoji} aria-hidden>{item.emoji}</span>
+              <span className={styles.emoji} aria-hidden>
+                {item.emoji}
+              </span>
               {item.label}
             </button>
           );

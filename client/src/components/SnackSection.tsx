@@ -26,7 +26,9 @@ export function SnackSection({ catalog, value, onChange }: Props) {
       <div className={styles.sectionHead}>
         <h2 id="snacks-title">Snacks</h2>
         {value.length > 0 && (
-          <button type="button" className={styles.clear} onClick={() => onChange([])}>Clear</button>
+          <button type="button" className={styles.clear} onClick={() => onChange([])}>
+            Clear
+          </button>
         )}
       </div>
       <ul className={styles.list}>
@@ -35,9 +37,18 @@ export function SnackSection({ catalog, value, onChange }: Props) {
           return (
             <li key={item.id} className={styles.listRow} data-active={qty > 0}>
               <span>
-                <span className={styles.emoji} aria-hidden>{item.emoji}</span> {item.label}
+                <span className={styles.emoji} aria-hidden>
+                  {item.emoji}
+                </span>{' '}
+                {item.label}
               </span>
-              <QtyStepper value={qty} min={0} max={item.maxQty} label={item.label} onChange={(q) => setQty(item.id, q)} />
+              <QtyStepper
+                value={qty}
+                min={0}
+                max={item.maxQty}
+                label={item.label}
+                onChange={(q) => setQty(item.id, q)}
+              />
             </li>
           );
         })}

@@ -18,7 +18,9 @@ export function RequestSummary({ lines, busy, onSend, onClearAll }: Props) {
           <>
             <div className={styles.sectionHead}>
               <strong>Your request</strong>
-              <button type="button" className={styles.clear} onClick={onClearAll}>Clear all</button>
+              <button type="button" className={styles.clear} onClick={onClearAll}>
+                Clear all
+              </button>
             </div>
             <ul>
               {lines.map((line, i) => (

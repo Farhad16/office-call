@@ -12,7 +12,9 @@ export function CustomSection({ value, onChange }: Props) {
       <div className={styles.sectionHead}>
         <h2 id="custom-title">Custom request</h2>
         {value && (
-          <button type="button" className={styles.clear} onClick={() => onChange('')}>Clear</button>
+          <button type="button" className={styles.clear} onClick={() => onChange('')}>
+            Clear
+          </button>
         )}
       </div>
       <textarea
@@ -24,7 +26,9 @@ export function CustomSection({ value, onChange }: Props) {
         placeholder="e.g. A glass of water, an HDMI cable…"
         aria-describedby="custom-count"
       />
-      <p id="custom-count" className={styles.counter}>{value.length}/{CUSTOM_MAX_LENGTH}</p>
+      <p id="custom-count" className={styles.counter}>
+        {value.length}/{CUSTOM_MAX_LENGTH}
+      </p>
     </section>
   );
 }

@@ -57,6 +57,7 @@ office-call/
   the same presets.
 
 **Limitations (by design, internal tool only):**
+
 - Anyone can type anyone's name and see or edit that person's presets.
 - Two people with the same name share one identity. Use a nickname to avoid this.
 - Never store anything private in presets or custom requests.
@@ -103,9 +104,7 @@ CREATE INDEX idx_requests_created ON requests(created_at);
 
 ```json
 {
-  "drinks": [
-    { "itemId": "tea", "qty": 1, "options": { "sugar": "less", "ginger": true, "lemon": true } }
-  ],
+  "drinks": [{ "itemId": "tea", "qty": 1, "options": { "sugar": "less", "ginger": true, "lemon": true } }],
   "snacks": [
     { "itemId": "chanachur", "qty": 1 },
     { "itemId": "biscuit", "qty": 2 }
@@ -118,27 +117,27 @@ Item IDs point into the config. Unknown IDs are rejected by the server.
 
 ## API
 
-| Method | Path                       | Purpose                                  |
-|--------|----------------------------|------------------------------------------|
-| GET    | /api/health                | Server alive check                       |
-| GET    | /api/items                 | Drinks, snacks and their options         |
-| POST   | /api/users                 | Get-or-create user by name               |
-| GET    | /api/users/:id/presets     | List this user's presets                 |
-| POST   | /api/users/:id/presets     | Create preset                            |
-| PUT    | /api/presets/:id           | Edit preset (must belong to user)        |
-| DELETE | /api/presets/:id           | Delete preset (must belong to user)      |
-| POST   | /api/requests              | Create order or call; returns saved row  |
-| GET    | /api/requests/recent       | Recent history (receiver page)           |
+| Method | Path                   | Purpose                                 |
+| ------ | ---------------------- | --------------------------------------- |
+| GET    | /api/health            | Server alive check                      |
+| GET    | /api/items             | Drinks, snacks and their options        |
+| POST   | /api/users             | Get-or-create user by name              |
+| GET    | /api/users/:id/presets | List this user's presets                |
+| POST   | /api/users/:id/presets | Create preset                           |
+| PUT    | /api/presets/:id       | Edit preset (must belong to user)       |
+| DELETE | /api/presets/:id       | Delete preset (must belong to user)     |
+| POST   | /api/requests          | Create order or call; returns saved row |
+| GET    | /api/requests/recent   | Recent history (receiver page)          |
 
 ## Socket.IO events
 
-| Event              | Direction            | Payload                              | Meaning |
-|--------------------|----------------------|--------------------------------------|---------|
-| `receiver:join`    | receiver → server    | — (ack returns pending requests)     | Receiver registers; gets anything not yet announced |
-| `request:new`      | server → receivers   | `{ id, userName, type, selection, createdAt }` | New request to announce |
-| `request:announced`| receiver → server    | `{ id }`                             | Receiver finished speaking it |
-| `request:status`   | server → all clients | `{ id, status }`                     | Requester sees "announced" |
-| `receiver:status`  | server → all clients | `{ online: boolean }`                | Shows if the speaker is listening |
+| Event               | Direction            | Payload                                        | Meaning                                             |
+| ------------------- | -------------------- | ---------------------------------------------- | --------------------------------------------------- |
+| `receiver:join`     | receiver → server    | — (ack returns pending requests)               | Receiver registers; gets anything not yet announced |
+| `request:new`       | server → receivers   | `{ id, userName, type, selection, createdAt }` | New request to announce                             |
+| `request:announced` | receiver → server    | `{ id }`                                       | Receiver finished speaking it                       |
+| `request:status`    | server → all clients | `{ id, status }`                               | Requester sees "announced"                          |
+| `receiver:status`   | server → all clients | `{ online: boolean }`                          | Shows if the speaker is listening                   |
 
 Socket.IO reconnects by itself after network drops. On reconnect the receiver sends
 `receiver:join` again and picks up any requests it missed.

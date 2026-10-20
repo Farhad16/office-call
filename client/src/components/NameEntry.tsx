@@ -45,7 +45,9 @@ export function NameEntry({ initialName = '', onSubmit, onCancel }: Props) {
         aria-describedby={error ? 'name-error' : 'name-hint'}
       />
       {error ? (
-        <p id="name-error" className={styles.error} role="alert">{error}</p>
+        <p id="name-error" className={styles.error} role="alert">
+          {error}
+        </p>
       ) : (
         <p id="name-hint" className={styles.hint}>
           This name is spoken on the office speaker. No password needed.
@@ -53,9 +55,13 @@ export function NameEntry({ initialName = '', onSubmit, onCancel }: Props) {
       )}
       <div className={styles.actions}>
         {onCancel && (
-          <button type="button" className={styles.secondary} onClick={onCancel}>Cancel</button>
+          <button type="button" className={styles.secondary} onClick={onCancel}>
+            Cancel
+          </button>
         )}
-        <button type="submit" className={styles.primary}>Continue</button>
+        <button type="submit" className={styles.primary}>
+          Continue
+        </button>
       </div>
     </form>
   );

@@ -9,7 +9,12 @@
   --danger: #b3261e;
   --success: #2e7d32;
   --shadow: 0 2px 12px rgba(60, 40, 20, 0.08);
-  font-family: system-ui, -apple-system, 'Segoe UI', 'Noto Sans Bengali', sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    'Noto Sans Bengali',
+    sans-serif;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -26,6 +31,20 @@
     --shadow: none;
   }
 }
-*, *::before, *::after { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.5; }
-button, input, textarea, select { font: inherit; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}

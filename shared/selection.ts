@@ -12,7 +12,10 @@ export function isEmptySelection(sel: Selection): boolean {
 
 /** Trim, collapse whitespace, drop control characters. */
 export function cleanText(raw: string): string {
-  return raw.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+  // Control characters are matched on purpose, to strip them.
+  // eslint-disable-next-line no-control-regex
+  const controlChars = /[\u0000-\u001f\u007f]/g;
+  return raw.replace(controlChars, ' ').replace(/\s+/g, ' ').trim();
 }
 
 export function findItem(list: ItemDef[], id: string): ItemDef | undefined {

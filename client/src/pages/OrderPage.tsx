@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Catalog, Selection } from '../../../shared/types.js';
 import { emptySelection, summarizeSelection } from '../../../shared/selection.js';
 import { getJson } from '../lib/api';
@@ -16,13 +16,17 @@ export function OrderPage() {
   const [selection, setSelection] = useState<Selection>(emptySelection);
   const [notice, setNotice] = useState<Notice>(null);
 
-  function loadCatalog() {
-    setLoadError(null);
+  const fetchCatalog = useCallback(() => {
     getJson<Catalog>('/api/items')
       .then(setCatalog)
       .catch((err: Error) => setLoadError(err.message));
+  }, []);
+  useEffect(fetchCatalog, [fetchCatalog]);
+
+  function retry() {
+    setLoadError(null);
+    fetchCatalog();
   }
-  useEffect(loadCatalog, []);
 
   const summary = useMemo(() => (catalog ? summarizeSelection(selection, catalog) : []), [selection, catalog]);
 
@@ -30,7 +34,9 @@ export function OrderPage() {
     return (
       <div className={styles.center}>
         <p className={styles.error}>{loadError}</p>
-        <button className={styles.retry} onClick={loadCatalog}>Try again</button>
+        <button className={styles.retry} onClick={retry}>
+          Try again
+        </button>
       </div>
     );
   }
@@ -66,10 +72,7 @@ export function OrderPage() {
         value={selection.snacks}
         onChange={(snacks) => setSelection((s) => ({ ...s, snacks }))}
       />
-      <CustomSection
-        value={selection.custom}
-        onChange={(custom) => setSelection((s) => ({ ...s, custom }))}
-      />
+      <CustomSection value={selection.custom} onChange={(custom) => setSelection((s) => ({ ...s, custom }))} />
       <RequestSummary
         lines={summary}
         busy={false}

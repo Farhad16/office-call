@@ -23,6 +23,14 @@ npm run dev
 - App: http://localhost:5173 (other devices: `http://<office-pc-ip>:5173`)
 - API: http://localhost:3000/api/health
 
+## Code checks
+
+```bash
+npm run lint          # ESLint: finds bugs and bad patterns
+npm run format        # Prettier: auto-formats all files
+npm run check         # lint + format check + build (run before committing)
+```
+
 ## Production (office computer)
 
 ```bash
