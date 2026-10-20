@@ -8,13 +8,6 @@
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
-  animation: open 0.18s var(--ease);
-}
-@keyframes open {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
 }
 .field {
   display: grid;

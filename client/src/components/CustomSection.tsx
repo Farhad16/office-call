@@ -10,7 +10,7 @@ type Props = {
 
 export function CustomSection({ value, onChange }: Props) {
   return (
-    <section className={styles.section} aria-labelledby="custom-title">
+    <section className={`${styles.section} reveal`} aria-labelledby="custom-title">
       <div className={styles.sectionHead}>
         <h2 id="custom-title">
           <span className={styles.sectionIcon} aria-hidden>

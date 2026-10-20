@@ -134,7 +134,7 @@ export function RequestCard({ request, catalog, onChangeStatus, busy = false, se
 
   return (
     <article
-      className={styles.card}
+      className={`${styles.card} reveal`}
       data-status={request.status}
       data-selected={selection?.selected || undefined}
       aria-busy={busy || undefined}

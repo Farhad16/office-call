@@ -26,7 +26,7 @@ export function DrinkSection({ catalog, value, onChange }: Props) {
   const toggles = options.filter((o) => o.kind === 'toggle');
 
   return (
-    <section className={styles.section} aria-labelledby="drinks-title">
+    <section className={`${styles.section} reveal`} aria-labelledby="drinks-title">
       <div className={styles.sectionHead}>
         <h2 id="drinks-title">
           <span className={styles.sectionIcon} aria-hidden>

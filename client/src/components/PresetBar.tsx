@@ -128,7 +128,7 @@ export function PresetBar({ user, catalog, selection, onLoad }: Props) {
   }
 
   return (
-    <section className={styles.bar} aria-labelledby="presets-title">
+    <section className={`${styles.bar} reveal`} aria-labelledby="presets-title">
       <div className={styles.head}>
         <h2 id="presets-title">
           <Bookmark size={16} aria-hidden /> My presets

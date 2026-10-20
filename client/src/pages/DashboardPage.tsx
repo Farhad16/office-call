@@ -26,6 +26,7 @@ import type {
 } from '../../../shared/types.js';
 import { deleteJson, errorMessage, getJson, patchJson } from '../lib/api';
 import { socket } from '../lib/socket';
+import { withTransition } from '../lib/transition';
 import { startOfToday } from '../lib/format';
 import { RequestCard, STATUS_LABEL } from '../components/RequestCard';
 import { Button } from '../components/ui/Button';
@@ -271,8 +272,10 @@ export function DashboardPage({ user }: { user: User }) {
   }
 
   function switchTab(next: Tab) {
-    setTab(next);
-    setSelected(new Set());
+    withTransition(() => {
+      setTab(next);
+      setSelected(new Set());
+    });
   }
 
   const inProgress = active?.filter((r) => r.status === 'in_progress').length ?? 0;
@@ -353,7 +356,7 @@ export function DashboardPage({ user }: { user: User }) {
     <section className={styles.page} aria-label="Dashboard">
       <div className={styles.cards}>
         {stats.map((s) => (
-          <div key={s.label} className={styles.stat} data-tone={s.tone}>
+          <div key={s.label} className={`${styles.stat} fade-in`} data-tone={s.tone}>
             <span className={styles.statIcon} aria-hidden>
               {s.icon}
             </span>
@@ -433,15 +436,23 @@ export function DashboardPage({ user }: { user: User }) {
         </div>
       </div>
 
-      {showFilters && (
-        <DashboardFilters
-          tab={tab}
-          filters={filters}
-          onChange={setFilters}
-          shown={tab === 'active' && active ? shownActive.length : null}
-          total={tab === 'active' && active ? active.length : null}
-        />
-      )}
+      {/* Always rendered so it can slide open and closed; `inert` hides it from keyboard when closed. */}
+      <div
+        className="collapse"
+        data-open={showFilters}
+        inert={!showFilters}
+        style={{ marginTop: showFilters ? 0 : -16 }}
+      >
+        <div>
+          <DashboardFilters
+            tab={tab}
+            filters={filters}
+            onChange={setFilters}
+            shown={tab === 'active' && active ? shownActive.length : null}
+            total={tab === 'active' && active ? active.length : null}
+          />
+        </div>
+      </div>
 
       {!user.isStaff && (
         <p className={styles.note}>
@@ -451,7 +462,7 @@ export function DashboardPage({ user }: { user: User }) {
       )}
 
       {tab === 'active' ? (
-        <div id="panel-active" role="tabpanel" aria-labelledby="tab-active">
+        <div id="panel-active" role="tabpanel" aria-labelledby="tab-active" className="fade-in">
           {activeError ? (
             <ErrorState message={activeError} onRetry={loadActive} />
           ) : !active || !catalog ? (
@@ -499,7 +510,7 @@ export function DashboardPage({ user }: { user: User }) {
           )}
         </div>
       ) : (
-        <div id="panel-history" role="tabpanel" aria-labelledby="tab-history">
+        <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" className="fade-in">
           {historyError ? (
             <ErrorState message={historyError} onRetry={() => loadHistory(0)} />
           ) : !history || !catalog ? (
@@ -566,7 +577,7 @@ export function DashboardPage({ user }: { user: User }) {
 
 function Loading() {
   return (
-    <div className={styles.state}>
+    <div className={`${styles.state} fade-in`}>
       <LoaderCircle className="spin" size={24} aria-hidden />
       <p>Loading…</p>
     </div>
@@ -575,7 +586,7 @@ function Loading() {
 
 function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className={styles.state}>
+    <div className={`${styles.state} fade-in`}>
       <p className={styles.error}>{message}</p>
       <Button icon={<RefreshCw size={15} />} onClick={onRetry}>
         Try again
@@ -586,7 +597,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 
 function EmptyState({ title, text, action }: { title: string; text: string; action?: ReactNode }) {
   return (
-    <div className={styles.state}>
+    <div className={`${styles.state} fade-in`}>
       <span className={styles.emptyIcon} aria-hidden>
         <Inbox size={26} />
       </span>

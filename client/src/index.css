@@ -154,3 +154,80 @@ h3 {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- Motion ---------- */
+
+/* Crossfade between screens (see lib/transition.ts). The header stays still. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.22s;
+  animation-timing-function: var(--ease);
+}
+::view-transition-old(root) {
+  animation-name: vt-out;
+}
+::view-transition-new(root) {
+  animation-name: vt-in;
+}
+@keyframes vt-out {
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@keyframes vt-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Sections fade + rise as they scroll into view (CSS scroll-driven animation). */
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@supports (animation-timeline: view()) {
+  .reveal {
+    animation: reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 45%;
+  }
+}
+
+/* Anything newly shown fades in. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.fade-in {
+  animation: fade-in 0.3s var(--ease) both;
+}
+
+/* Smooth open/close for panels: wrap content in .collapse > div */
+.collapse {
+  display: grid;
+  align-self: start; /* inside a grid parent, don't stretch the closed panel */
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.28s var(--ease),
+    opacity 0.2s var(--ease),
+    margin 0.28s var(--ease);
+}
+.collapse > * {
+  min-height: 0;
+  overflow: hidden;
+}
+.collapse[data-open='true'] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}

@@ -24,7 +24,7 @@ export function SnackSection({ catalog, value, onChange }: Props) {
   }
 
   return (
-    <section className={styles.section} aria-labelledby="snacks-title">
+    <section className={`${styles.section} reveal`} aria-labelledby="snacks-title">
       <div className={styles.sectionHead}>
         <h2 id="snacks-title">
           <span className={styles.sectionIcon} aria-hidden>

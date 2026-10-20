@@ -381,7 +381,7 @@ export function ReceiverPage() {
         {error && callout('bad', error)}
 
         {!started ? (
-          <section className={styles.startCard}>
+          <section className={`${styles.startCard} fade-in`}>
             <span className={styles.startIcon} aria-hidden>
               <Volume2 size={30} />
             </span>
@@ -429,7 +429,7 @@ export function ReceiverPage() {
                 {queued > 0 && <Badge tone="info">{queued} more in queue</Badge>}
               </section>
 
-              <section className={styles.card}>
+              <section className={`${styles.card} reveal`}>
                 <h2>
                   <Settings2 size={17} aria-hidden /> Voice
                 </h2>
@@ -492,7 +492,7 @@ export function ReceiverPage() {
               </section>
             </div>
 
-            <section className={`${styles.card} ${styles.historyCard}`}>
+            <section className={`${styles.card} ${styles.historyCard} fade-in`}>
               <h2>
                 <History size={17} aria-hidden /> Recent requests
               </h2>
