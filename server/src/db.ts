@@ -285,10 +285,18 @@ const listActiveRows = db.prepare<[], RequestRow>(
 const countCompletedSince = db.prepare<[string], { n: number }>(
   `SELECT COUNT(*) AS n FROM requests WHERE status = 'done' AND completed_at >= ?`,
 );
-const listHistoryRows = db.prepare<[string, string, number, number], RequestRow>(
+// Each filter is skipped when its value is empty / 0.
+const listHistoryRows = db.prepare<
+  { q: string; pattern: string; type: string; userId: number; since: string; limit: number; offset: number },
+  RequestRow
+>(
   `SELECT ${COLUMNS} FROM requests
-   WHERE status = 'done' AND (? = '' OR search_text LIKE ? ESCAPE '\\')
-   ORDER BY completed_at DESC, id DESC LIMIT ? OFFSET ?`,
+   WHERE status = 'done'
+     AND (@q = '' OR search_text LIKE @pattern ESCAPE '\\')
+     AND (@type = '' OR type = @type)
+     AND (@userId = 0 OR user_id = @userId)
+     AND (@since = '' OR completed_at >= @since)
+   ORDER BY completed_at DESC, id DESC LIMIT @limit OFFSET @offset`,
 );
 // Changes status only if it is still `from`, so a stale update can never overwrite a newer one.
 const setStatusRow = db.prepare<{ to: RequestStatus; from: RequestStatus; staff: string; id: number }>(
@@ -378,15 +386,26 @@ export function countCompletedSinceTime(sinceIso: string): number {
   return countCompletedSince.get(sinceIso)!.n;
 }
 
+export type HistoryFilters = { type?: RequestType; userId?: number; since?: string };
+
 /** Done requests, most recently completed first. `query` matches name or content. */
 export function listHistory(
   query: string,
   limit: number,
   offset: number,
+  filters: HistoryFilters = {},
 ): { requests: OfficeRequest[]; hasMore: boolean } {
   const q = query.toLocaleLowerCase();
   const pattern = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`; // treat % and _ as normal text
-  const rows = listHistoryRows.all(q, pattern, limit + 1, offset);
+  const rows = listHistoryRows.all({
+    q,
+    pattern,
+    type: filters.type ?? '',
+    userId: filters.userId ?? 0,
+    since: filters.since ?? '',
+    limit: limit + 1,
+    offset,
+  });
   return { requests: rows.slice(0, limit).map(toRequest), hasMore: rows.length > limit };
 }
 

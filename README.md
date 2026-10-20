@@ -23,6 +23,8 @@ npm start                          # prints the addresses for phones
     speaker button in the header.
   - Tick several cards to delete them together.
   - Switch between **List** (default) and **Cards** view; the choice is remembered per device.
+  - **Search** and **Filters**: type (orders / calls), status (queue), completed date
+    (history: today / 7 / 30 days), and **Only my requests**.
 
 For start-at-boot, HTTPS and installing the app on phones, follow [docs/DEPLOY.md](docs/DEPLOY.md).
 

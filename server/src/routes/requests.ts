@@ -75,13 +75,21 @@ requestsRouter.get('/active', (req, res) => {
   res.json(body);
 });
 
-// Dashboard history: done requests, newest completion first, optional search.
+// Dashboard history: done requests, newest completion first.
+// Optional filters: q (name/content), type (order|call), userId (only mine), since (ISO time).
 requestsRouter.get('/history', (req, res) => {
   const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
+  const type = req.query.type === 'order' || req.query.type === 'call' ? req.query.type : undefined;
+  const userId = clampInt(req.query.userId, 0, 0, Number.MAX_SAFE_INTEGER) || undefined;
+  const since =
+    typeof req.query.since === 'string' && !Number.isNaN(Date.parse(req.query.since))
+      ? new Date(req.query.since).toISOString()
+      : undefined;
   const body: HistoryResponse = listHistory(
     q,
     clampInt(req.query.limit, 50, 1, 100),
     clampInt(req.query.offset, 0, 0, 1e6),
+    { type, userId, since },
   );
   res.json(body);
 });

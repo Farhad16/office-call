@@ -270,3 +270,18 @@
 .rows > li + li {
   border-top: 1px solid var(--border);
 }
+.filterCount {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.7rem;
+}
+button[aria-expanded='true'] .filterCount {
+  background: var(--on-accent);
+  color: var(--accent);
+}

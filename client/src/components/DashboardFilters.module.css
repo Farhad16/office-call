@@ -1,0 +1,54 @@
+.panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px 20px;
+  padding: 14px 16px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  animation: open 0.18s var(--ease);
+}
+@keyframes open {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.field {
+  display: grid;
+  gap: 6px;
+}
+.label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.mine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.mine input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  min-height: 38px;
+}
+.count {
+  font-size: 0.85rem;
+  color: var(--muted);
+}

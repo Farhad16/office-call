@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import {
@@ -11,6 +11,7 @@ import {
   LoaderCircle,
   RefreshCw,
   Search,
+  SlidersHorizontal,
   Trash2,
 } from 'lucide-react';
 import { canDelete } from '../../../shared/types.js';
@@ -30,6 +31,14 @@ import { RequestCard, STATUS_LABEL } from '../components/RequestCard';
 import { Button } from '../components/ui/Button';
 import { useConfirm } from '../components/ui/Confirm';
 import { Segmented } from '../components/ui/Segmented';
+import {
+  DashboardFilters,
+  DEFAULT_FILTERS,
+  activeFilterCount,
+  rangeStart,
+  type Filters,
+} from '../components/DashboardFilters';
+import { summarizeSelection } from '../../../shared/selection.js';
 import styles from './DashboardPage.module.css';
 
 type Tab = 'active' | 'history';
@@ -91,10 +100,16 @@ export function DashboardPage({ user }: { user: User }) {
   // Ids already counted in "completed today", so a repeated event never counts twice.
   const counted = useRef(new Set<number>());
   const since = useRef(startOfToday());
-  const queryRef = useRef(query);
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
+
+  // History is filtered on the server. This key changes whenever its search or filters change.
+  const historyParams = { q: query, type: filters.type, mine: filters.mine, range: filters.range };
+  const historyKey = JSON.stringify(historyParams);
+  const historyRef = useRef(historyParams);
   useEffect(() => {
-    queryRef.current = query;
-  }, [query]);
+    historyRef.current = JSON.parse(historyKey);
+  }, [historyKey]);
 
   const loadActive = useCallback(() => {
     since.current = startOfToday();
@@ -108,18 +123,27 @@ export function DashboardPage({ user }: { user: User }) {
       .catch((err) => setActiveError(errorMessage(err)));
   }, []);
 
-  const loadHistory = useCallback((q: string, offset: number) => {
-    getJson<HistoryResponse>(`/api/requests/history?limit=${HISTORY_PAGE}&offset=${offset}&q=${encodeURIComponent(q)}`)
-      .then((res) => {
-        // Ignore answers to an older search.
-        if (q !== queryRef.current) return;
-        setHistory((list) => (offset === 0 ? res.requests : [...(list ?? []), ...res.requests]));
-        setHasMore(res.hasMore);
-        setHistoryError(null);
-      })
-      .catch((err) => setHistoryError(errorMessage(err)))
-      .finally(() => setHistoryLoading(false));
-  }, []);
+  const loadHistory = useCallback(
+    (offset: number) => {
+      const p = historyRef.current;
+      const key = JSON.stringify(p);
+      const params = new URLSearchParams({ limit: String(HISTORY_PAGE), offset: String(offset), q: p.q });
+      if (p.type !== 'all') params.set('type', p.type);
+      if (p.mine) params.set('userId', String(user.id));
+      if (p.range !== 'all') params.set('since', rangeStart(p.range));
+      getJson<HistoryResponse>(`/api/requests/history?${params}`)
+        .then((res) => {
+          // Ignore answers to an older search or filter.
+          if (key !== JSON.stringify(historyRef.current)) return;
+          setHistory((list) => (offset === 0 ? res.requests : [...(list ?? []), ...res.requests]));
+          setHasMore(res.hasMore);
+          setHistoryError(null);
+        })
+        .catch((err) => setHistoryError(errorMessage(err)))
+        .finally(() => setHistoryLoading(false));
+    },
+    [user.id],
+  );
 
   useEffect(() => {
     getJson<Catalog>('/api/items')
@@ -134,27 +158,38 @@ export function DashboardPage({ user }: { user: User }) {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Load history when the tab opens or the search changes.
+  // Load history when the tab opens or its search/filters change (after the ref is updated).
   useEffect(() => {
-    if (tab === 'history') loadHistory(query, 0);
-  }, [tab, query, loadHistory]);
+    if (tab !== 'history') return;
+    const timer = setTimeout(() => loadHistory(0), 0);
+    return () => clearTimeout(timer);
+  }, [tab, historyKey, loadHistory]);
 
   /** Applies a new or changed request to every list and the counters. */
-  const apply = useCallback((request: OfficeRequest) => {
-    if (request.status === 'done') {
-      setActive((list) => list?.filter((r) => r.id !== request.id) ?? list);
-      if (request.completedAt && request.completedAt >= since.current && !counted.current.has(request.id)) {
-        counted.current.add(request.id);
-        setCompletedToday((n) => n + 1);
+  const apply = useCallback(
+    (request: OfficeRequest) => {
+      if (request.status === 'done') {
+        setActive((list) => list?.filter((r) => r.id !== request.id) ?? list);
+        if (request.completedAt && request.completedAt >= since.current && !counted.current.has(request.id)) {
+          counted.current.add(request.id);
+          setCompletedToday((n) => n + 1);
+        }
+        // New completions go on top of history if they match the current filters.
+        const p = historyRef.current;
+        const matches =
+          p.q === '' &&
+          (p.type === 'all' || p.type === request.type) &&
+          (!p.mine || request.userId === user.id) &&
+          (p.range === 'all' || (request.completedAt ?? '') >= rangeStart(p.range));
+        if (matches) {
+          setHistory((list) => (list ? [request, ...list.filter((r) => r.id !== request.id)] : list));
+        }
+      } else {
+        setActive((list) => (list ? upsert(list, request).sort(byCreated) : list));
       }
-      // New completions go on top of an unfiltered history; a search is refreshed instead.
-      if (queryRef.current === '') {
-        setHistory((list) => (list ? [request, ...list.filter((r) => r.id !== request.id)] : list));
-      }
-    } else {
-      setActive((list) => (list ? upsert(list, request).sort(byCreated) : list));
-    }
-  }, []);
+    },
+    [user.id],
+  );
 
   const removeLocal = useCallback((ids: number[]) => {
     const gone = new Set(ids);
@@ -167,7 +202,7 @@ export function DashboardPage({ user }: { user: User }) {
   useEffect(() => {
     const onConnect = () => {
       loadActive();
-      if (tab === 'history') loadHistory(queryRef.current, 0);
+      if (tab === 'history') loadHistory(0);
     };
     // Deleted anywhere: drop it here, and reload counts ("completed today" may change).
     const onDeleted = ({ ids }: { ids: number[] }) => {
@@ -244,7 +279,22 @@ export function DashboardPage({ user }: { user: User }) {
   const onChangeStatus = user.isStaff ? changeStatus : undefined;
 
   // Selection only ever covers requests this viewer may delete in the current tab.
-  const visible = (tab === 'active' ? active : history) ?? [];
+  // Active Queue is all in memory, so it is filtered here.
+  const q = query.toLocaleLowerCase();
+  const shownActive = (active ?? []).filter((r) => {
+    if (filters.type !== 'all' && r.type !== filters.type) return false;
+    if (filters.status !== 'all' && r.status !== filters.status) return false;
+    if (filters.mine && r.userId !== user.id) return false;
+    if (!q) return true;
+    const text = [
+      r.userName,
+      r.type === 'call' ? 'call staff' : '',
+      ...(r.selection && catalog ? summarizeSelection(r.selection, catalog) : []),
+    ];
+    return text.join(' ').toLocaleLowerCase().includes(q);
+  });
+  const filterCount = activeFilterCount(filters, tab) + Number(q !== '');
+  const visible = (tab === 'active' ? shownActive : history) ?? [];
   const deletable = visible.filter((r) => canDelete(r, user));
   const chosen = deletable.filter((r) => selected.has(r.id)).map((r) => r.id);
   const allChosen = deletable.length > 0 && chosen.length === deletable.length;
@@ -330,18 +380,28 @@ export function DashboardPage({ user }: { user: User }) {
           ))}
         </div>
         <div className={styles.barRight}>
-          {tab === 'history' && (
-            <label className={styles.search}>
-              <Search size={16} aria-hidden />
-              <input
-                type="search"
-                placeholder="Search name or item…"
-                aria-label="Search history"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </label>
-          )}
+          <label className={styles.search}>
+            <Search size={16} aria-hidden />
+            <input
+              type="search"
+              placeholder="Search name or item…"
+              aria-label={tab === 'active' ? 'Search queue' : 'Search history'}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </label>
+          <Button
+            size="sm"
+            variant={showFilters ? 'primary' : 'secondary'}
+            icon={<SlidersHorizontal size={15} />}
+            aria-expanded={showFilters}
+            onClick={() => setShowFilters((v) => !v)}
+          >
+            Filters
+            {activeFilterCount(filters, tab) > 0 && (
+              <span className={styles.filterCount}>{activeFilterCount(filters, tab)}</span>
+            )}
+          </Button>
           <Segmented
             name="view"
             label="View"
@@ -373,6 +433,16 @@ export function DashboardPage({ user }: { user: User }) {
         </div>
       </div>
 
+      {showFilters && (
+        <DashboardFilters
+          tab={tab}
+          filters={filters}
+          onChange={setFilters}
+          shown={tab === 'active' && active ? shownActive.length : null}
+          total={tab === 'active' && active ? active.length : null}
+        />
+      )}
+
       {!user.isStaff && (
         <p className={styles.note}>
           You can delete your own orders unless they are in progress. Receivers update status (turn on “I am a receiver”
@@ -388,6 +458,22 @@ export function DashboardPage({ user }: { user: User }) {
             <Loading />
           ) : active.length === 0 ? (
             <EmptyState title="All caught up" text="No active requests right now ☕" />
+          ) : shownActive.length === 0 ? (
+            <EmptyState
+              title="No matches"
+              text={`None of the ${active.length} active requests match your search or filters.`}
+              action={
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setFilters(DEFAULT_FILTERS);
+                    setSearch('');
+                  }}
+                >
+                  Clear filters
+                </Button>
+              }
+            />
           ) : (
             <>
               {toolbar}
@@ -396,7 +482,7 @@ export function DashboardPage({ user }: { user: User }) {
                 className={view === 'list' ? styles.rows : styles.list}
                 style={{ '--row-actions': user.isStaff ? '260px' : '40px' } as CSSProperties}
               >
-                {active.map((r) => (
+                {shownActive.map((r) => (
                   <li key={r.id}>
                     <RequestCard
                       request={r}
@@ -415,12 +501,26 @@ export function DashboardPage({ user }: { user: User }) {
       ) : (
         <div id="panel-history" role="tabpanel" aria-labelledby="tab-history">
           {historyError ? (
-            <ErrorState message={historyError} onRetry={() => loadHistory(query, 0)} />
+            <ErrorState message={historyError} onRetry={() => loadHistory(0)} />
           ) : !history || !catalog ? (
             <Loading />
           ) : history.length === 0 ? (
-            query ? (
-              <EmptyState title="No matches" text={`Nothing matches “${query}”.`} />
+            filterCount > 0 ? (
+              <EmptyState
+                title="No matches"
+                text={query ? `Nothing matches “${query}” with these filters.` : 'Nothing matches these filters.'}
+                action={
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setFilters(DEFAULT_FILTERS);
+                      setSearch('');
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                }
+              />
             ) : (
               <EmptyState title="No history yet" text="Completed requests show up here." />
             )
@@ -450,7 +550,7 @@ export function DashboardPage({ user }: { user: User }) {
                   loading={historyLoading}
                   onClick={() => {
                     setHistoryLoading(true);
-                    loadHistory(query, history.length);
+                    loadHistory(history.length);
                   }}
                 >
                   Load more
@@ -484,7 +584,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
   );
 }
 
-function EmptyState({ title, text }: { title: string; text: string }) {
+function EmptyState({ title, text, action }: { title: string; text: string; action?: ReactNode }) {
   return (
     <div className={styles.state}>
       <span className={styles.emptyIcon} aria-hidden>
@@ -492,6 +592,7 @@ function EmptyState({ title, text }: { title: string; text: string }) {
       </span>
       <p className={styles.emptyTitle}>{title}</p>
       <p>{text}</p>
+      {action}
     </div>
   );
 }

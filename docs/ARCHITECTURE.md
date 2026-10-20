@@ -235,6 +235,8 @@ Socket.IO reconnects by itself after network drops. On reconnect the receiver se
   reconnect. "Completed today" counts from the viewer's local midnight.
 - If a request is marked done or deleted before the speaker has said it, the speaker
   drops it from its queue ("Done before announced" / "Deleted").
+- Filters: the Active Queue is filtered in the browser (it is all loaded). History is
+  filtered on the server because it is loaded 50 at a time.
 - Bulk delete: tick cards, or **Select all I can delete**, then **Delete selected**. Only
   cards the viewer may delete get a checkbox. The server deletes what is allowed, in one
   transaction, and reports the rest. If an order moves to In Progress while it is ticked,
