@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Coffee } from 'lucide-react';
 import type { Catalog, DrinkLine, OptionValue } from '../../../shared/types.js';
 import { findItem, isOptionVisible, itemOptions, newDrinkLine, visibleValues } from '../../../shared/selection.js';
@@ -13,7 +14,11 @@ type Props = {
 };
 
 export function DrinkSection({ catalog, value, onChange }: Props) {
-  const selected = value ? findItem(catalog.drinks, value.itemId) : undefined;
+  // Keep showing the last drink's options while the panel slides closed.
+  const [shown, setShown] = useState<DrinkLine | null>(value);
+  if (value && value !== shown) setShown(value);
+  const line = value ?? shown;
+  const selected = line ? findItem(catalog.drinks, line.itemId) : undefined;
 
   function setOption(id: string, v: OptionValue) {
     if (!value || !selected) return;
@@ -21,7 +26,7 @@ export function DrinkSection({ catalog, value, onChange }: Props) {
   }
 
   const options =
-    value && selected ? itemOptions(selected, catalog).filter((o) => isOptionVisible(o, value.options)) : [];
+    line && selected ? itemOptions(selected, catalog).filter((o) => isOptionVisible(o, line.options)) : [];
   const choices = options.filter((o) => o.kind === 'choice');
   const toggles = options.filter((o) => o.kind === 'toggle');
 
@@ -61,53 +66,57 @@ export function DrinkSection({ catalog, value, onChange }: Props) {
         })}
       </div>
 
-      {value && selected && (
-        <div className={styles.options}>
-          {choices.map(
-            (option) =>
-              option.kind === 'choice' && (
-                <div key={option.id} className={styles.optionRow}>
-                  <span className={styles.optionLabel}>{option.label}</span>
-                  <Segmented
-                    name={option.id}
-                    label={option.label}
-                    size="sm"
-                    value={value.options[option.id] as string}
-                    onChange={(v) => setOption(option.id, v)}
-                    options={option.choices.map((c) => ({ value: c.id, label: c.label.replace(/ sugar$/i, '') }))}
-                  />
+      <div className="collapse" data-open={!!value} inert={!value}>
+        <div>
+          {line && selected && (
+            <div className={styles.options}>
+              {choices.map(
+                (option) =>
+                  option.kind === 'choice' && (
+                    <div key={option.id} className={styles.optionRow}>
+                      <span className={styles.optionLabel}>{option.label}</span>
+                      <Segmented
+                        name={option.id}
+                        label={option.label}
+                        size="sm"
+                        value={line.options[option.id] as string}
+                        onChange={(v) => setOption(option.id, v)}
+                        options={option.choices.map((c) => ({ value: c.id, label: c.label.replace(/ sugar$/i, '') }))}
+                      />
+                    </div>
+                  ),
+              )}
+              {toggles.length > 0 && (
+                <div className={styles.optionRow}>
+                  <span className={styles.optionLabel}>Add</span>
+                  <div className={styles.chips}>
+                    {toggles.map((option) => (
+                      <label key={option.id} className={styles.chip}>
+                        <input
+                          type="checkbox"
+                          checked={line.options[option.id] === true}
+                          onChange={(e) => setOption(option.id, e.target.checked)}
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              ),
-          )}
-          {toggles.length > 0 && (
-            <div className={styles.optionRow}>
-              <span className={styles.optionLabel}>Add</span>
-              <div className={styles.chips}>
-                {toggles.map((option) => (
-                  <label key={option.id} className={styles.chip}>
-                    <input
-                      type="checkbox"
-                      checked={value.options[option.id] === true}
-                      onChange={(e) => setOption(option.id, e.target.checked)}
-                    />
-                    <span>{option.label}</span>
-                  </label>
-                ))}
+              )}
+              <div className={styles.optionRow}>
+                <span className={styles.optionLabel}>Cups</span>
+                <QtyStepper
+                  value={line.qty}
+                  min={1}
+                  max={selected.maxQty}
+                  label={selected.label}
+                  onChange={(qty) => value && onChange({ ...value, qty })}
+                />
               </div>
             </div>
           )}
-          <div className={styles.optionRow}>
-            <span className={styles.optionLabel}>Cups</span>
-            <QtyStepper
-              value={value.qty}
-              min={1}
-              max={selected.maxQty}
-              label={selected.label}
-              onChange={(qty) => onChange({ ...value, qty })}
-            />
-          </div>
         </div>
-      )}
+      </div>
     </section>
   );
 }

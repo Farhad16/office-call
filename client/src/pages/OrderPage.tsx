@@ -100,7 +100,7 @@ export function OrderPage({ user }: { user: User }) {
 
   if (loadError) {
     return (
-      <div className={styles.center}>
+      <div className={`${styles.center} fade-in`}>
         <span className={styles.centerIcon} aria-hidden>
           <WifiOff size={24} />
         </span>
@@ -113,7 +113,7 @@ export function OrderPage({ user }: { user: User }) {
   }
   if (!catalog) {
     return (
-      <div className={styles.center}>
+      <div className={`${styles.center} fade-in`}>
         <LoaderCircle className="spin" size={26} aria-hidden />
         <p>Loading menu…</p>
       </div>
@@ -124,7 +124,7 @@ export function OrderPage({ user }: { user: User }) {
   return (
     <div className={styles.layout}>
       <div className={styles.main}>
-        <div className={styles.hero}>
+        <div className={`${styles.hero} fade-in`}>
           <div>
             <h1 className={styles.greeting}>Hi {user.name.split(' ')[0]} 👋</h1>
             <ConnectionStatus {...connection} />

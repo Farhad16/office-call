@@ -262,6 +262,10 @@
 }
 .details[open] > :not(summary) {
   margin-top: 14px;
+  animation: fade-in 0.28s var(--ease) both;
+}
+.details summary svg {
+  transition: transform 0.2s var(--ease);
 }
 .switches {
   display: grid;

@@ -316,7 +316,7 @@ export function DashboardPage({ user }: { user: User }) {
       : undefined;
 
   const toolbar = deletable.length > 0 && (
-    <div className={styles.toolbar} data-active={chosen.length > 0 || undefined}>
+    <div className={`${styles.toolbar} fade-in`} data-active={chosen.length > 0 || undefined}>
       <label>
         <input
           type="checkbox"
@@ -355,8 +355,13 @@ export function DashboardPage({ user }: { user: User }) {
   return (
     <section className={styles.page} aria-label="Dashboard">
       <div className={styles.cards}>
-        {stats.map((s) => (
-          <div key={s.label} className={`${styles.stat} fade-in`} data-tone={s.tone}>
+        {stats.map((s, i) => (
+          <div
+            key={s.label}
+            className={`${styles.stat} fade-in`}
+            data-tone={s.tone}
+            style={{ animationDelay: `${i * 60}ms` }}
+          >
             <span className={styles.statIcon} aria-hidden>
               {s.icon}
             </span>

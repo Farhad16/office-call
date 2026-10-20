@@ -101,7 +101,6 @@
   padding: 16px;
   border-radius: var(--r-lg);
   background: var(--surface-2);
-  animation: fadeIn 0.2s var(--ease);
 }
 @keyframes fadeIn {
   from {

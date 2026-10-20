@@ -167,7 +167,7 @@ export function PresetBar({ user, catalog, selection, onLoad }: Props) {
       </div>
 
       {active && !form && (
-        <div className={styles.activeRow}>
+        <div className={`${styles.activeRow} fade-in`}>
           <span className={styles.muted}>
             Loaded <strong>{active.name}</strong>
             {modified && <span className={styles.changed}> · changed</span>}
@@ -194,7 +194,7 @@ export function PresetBar({ user, catalog, selection, onLoad }: Props) {
       )}
 
       {form && (
-        <form className={styles.form} onSubmit={submitForm} noValidate>
+        <form className={`${styles.form} fade-in`} onSubmit={submitForm} noValidate>
           <input
             className="input"
             value={formName}

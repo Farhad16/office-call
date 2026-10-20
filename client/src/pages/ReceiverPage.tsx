@@ -410,7 +410,7 @@ export function ReceiverPage() {
         ) : (
           <div className={styles.grid}>
             <div className={styles.column}>
-              <section className={styles.now} data-speaking={!!speaking || undefined} aria-live="polite">
+              <section className={`${styles.now} fade-in`} data-speaking={!!speaking || undefined} aria-live="polite">
                 <div className={styles.wave} aria-hidden>
                   <span />
                   <span />
@@ -501,7 +501,7 @@ export function ReceiverPage() {
               ) : (
                 <ul ref={historyRef} className={styles.history}>
                   {history.map(({ request, state, error }) => (
-                    <li key={request.id} data-state={state}>
+                    <li key={request.id} data-state={state} className="reveal">
                       <span className={styles.time}>{timeOf(request.createdAt)}</span>
                       <span className={styles.text}>
                         {textOf(request)}

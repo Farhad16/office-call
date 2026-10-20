@@ -18,7 +18,7 @@ export function RequestSummary({ lines, sending, sent, disabled, onSend, onClear
   const [listRef] = useAutoAnimate<HTMLUListElement>();
 
   return (
-    <aside className={styles.panel} aria-label="Your request">
+    <aside className={`${styles.panel} fade-in`} aria-label="Your request">
       <div className={styles.head}>
         <h2>
           <ReceiptText size={18} aria-hidden /> Your request

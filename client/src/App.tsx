@@ -91,7 +91,7 @@ export default function App() {
   if (session.status !== 'ready') {
     return (
       <main className={styles.auth}>
-        <div className={styles.stateCard}>
+        <div className={`${styles.stateCard} fade-in`}>
           {session.status === 'loading' ? (
             <>
               <LoaderCircle className="spin" size={28} aria-hidden />

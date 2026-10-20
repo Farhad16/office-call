@@ -77,7 +77,7 @@ export function RequestCard({ request, catalog, onChangeStatus, busy = false, se
   if (layout === 'row') {
     return (
       <article
-        className={styles.row}
+        className={`${styles.row} reveal`}
         data-status={request.status}
         data-selected={selection?.selected || undefined}
         aria-busy={busy || undefined}
