@@ -297,3 +297,51 @@ export function subtractSelection(base: Selection, extra: Selection, catalog: Ca
     : base.custom;
   return { drinks: drinks.filter((d) => d.qty > 0), snacks: snacks.filter((s) => s.qty > 0), custom };
 }
+
+/**
+ * Short one-line description for compact cards, e.g.
+ * "Black Tea, less sugar, ginger & lemon · 2 Biscuits · “Room 4”". Default choices are left out.
+ */
+export function shortSummary(sel: Selection, catalog: Catalog): string {
+  const parts: string[] = [];
+  for (const line of sel.drinks) {
+    const item = findItem(catalog.drinks, line.itemId);
+    if (!item) continue;
+    let text = `${line.qty > 1 ? `${line.qty} ` : ''}${drinkName(item, line, catalog).label}`;
+    const addOns: string[] = [];
+    for (const option of itemOptions(item, catalog)) {
+      if (option.kind === 'toggle') {
+        if (line.options[option.id] === true) addOns.push(option.label.toLowerCase());
+        continue;
+      }
+      if (option.nameModifier) continue;
+      const choice = option.choices.find((c) => c.id === line.options[option.id]);
+      if (choice && choice.id !== option.default) text += `, ${choice.label.toLowerCase()}`;
+    }
+    if (addOns.length) text += `, ${addOns.join(' & ')}`;
+    parts.push(text);
+  }
+  for (const line of sel.snacks) {
+    const item = findItem(catalog.snacks, line.itemId);
+    if (item) parts.push(`${line.qty > 1 ? `${line.qty} ` : ''}${item.label}`);
+  }
+  const custom = cleanText(sel.custom);
+  if (custom) parts.push(`“${custom}”`);
+  return parts.join(' · ');
+}
+
+/** Emoji of what's inside (drinks first), for compact cards. */
+export function selectionEmojis(sel: Selection, catalog: Catalog, max = 3): string[] {
+  const variants = drinkVariants(catalog);
+  const out: string[] = [];
+  for (const line of sel.drinks) {
+    const v = variants.find((x) => x.key === variantKeyOf(line, catalog));
+    if (v) out.push(v.emoji);
+  }
+  for (const line of sel.snacks) {
+    const item = findItem(catalog.snacks, line.itemId);
+    if (item) out.push(item.emoji);
+  }
+  if (out.length === 0 && cleanText(sel.custom)) out.push('📝');
+  return [...new Set(out)].slice(0, max);
+}
