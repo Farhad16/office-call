@@ -63,6 +63,9 @@ The right side shows the **live queue** (pending and in progress, oldest first) 
 buttons need a receiver: the page reuses the name saved on that PC, or shows a small
 "Sign in as receiver" form. Done requests leave the queue and appear in Dashboard → History.
 
+The speaker remembers it was on: after a reload it resumes by itself (on your first
+click if the browser blocks sound). **Stop speaker** turns it off on that device.
+
 If the page is reloaded or the network drops, it reconnects by itself. Requests from the
 last 30 minutes that were not announced yet get announced after it reconnects.
 

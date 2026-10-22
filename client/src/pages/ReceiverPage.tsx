@@ -70,6 +70,24 @@ const SAMPLE_ORDER: OfficeRequest['selection'] = {
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const AUTOSTART = new URLSearchParams(window.location.search).get('autostart') === '1';
+
+// Remembered per device: was the speaker running? If so it resumes after a reload.
+const SPEAKER_ON_KEY = 'officeCall.speakerOn';
+function wasSpeakerOn(): boolean {
+  try {
+    return localStorage.getItem(SPEAKER_ON_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+function rememberSpeakerOn(on: boolean) {
+  try {
+    localStorage.setItem(SPEAKER_ON_KEY, on ? '1' : '0');
+  } catch {
+    // ignore
+  }
+}
+const WAS_ON = wasSpeakerOn();
 let testId = 0; // test announcements use negative ids and are never sent to the server
 
 type Props = {
@@ -99,6 +117,7 @@ export function ReceiverPage({
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [autoBlocked, setAutoBlocked] = useState(false);
+  const starting = useRef(false);
   const [queueRef] = useAutoAnimate<HTMLOListElement>();
 
   // Receiver sign-in (status buttons need one). Reuses the name saved on this PC.
@@ -202,6 +221,8 @@ export function ReceiverPage({
    * if the browser still blocks sound, and the Start button stays visible.
    */
   async function start(auto = false) {
+    if (started || starting.current) return; // e.g. the Start click also counts as "any click"
+    starting.current = true;
     let ctx: AudioContext | null;
     try {
       const Ctx =
@@ -215,6 +236,7 @@ export function ReceiverPage({
     if (auto && ctx?.state !== 'running') {
       ctx?.close().catch(() => {});
       setAutoBlocked(true);
+      starting.current = false;
       return;
     }
     audioCtx.current = ctx;
@@ -232,13 +254,34 @@ export function ReceiverPage({
       setError(`Could not load history: ${errorMessage(err)}`);
     }
     setStarted(true);
+    rememberSpeakerOn(true);
   }
+
+  /** Turns the speaker off for this device (it won't resume after a reload). */
+  function stop() {
+    rememberSpeakerOn(false);
+    window.location.reload();
+  }
+
+  // Sound was blocked on auto-start: start on the next click or key press anywhere.
+  useEffect(() => {
+    if (!autoBlocked || started) return;
+    const go = () => start();
+    window.addEventListener('pointerdown', go, { capture: true });
+    window.addEventListener('keydown', go, { capture: true });
+    return () => {
+      window.removeEventListener('pointerdown', go, { capture: true });
+      window.removeEventListener('keydown', go, { capture: true });
+    };
+    // start only touches refs and state setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoBlocked, started]);
 
   // ?autostart=1: try to start as soon as the menu and voices are ready.
   const [autoTried, setAutoTried] = useState(false);
   const ready = catalog !== null && voices !== null;
   useEffect(() => {
-    if (!(AUTOSTART || autoStart) || autoTried || !ready) return;
+    if (!(AUTOSTART || autoStart || WAS_ON) || autoTried || !ready) return;
     const timer = setTimeout(() => {
       setAutoTried(true);
       // Hand-over from the standalone page: the user already clicked here, so start
@@ -457,7 +500,7 @@ export function ReceiverPage({
           {autoBlocked &&
             callout(
               'warn',
-              'The browser blocked automatic sound. Click Start once (or see docs/DEPLOY.md to allow it).',
+              'The speaker was on before. The browser needs one click for sound: it starts on your next click anywhere.',
             )}
           <Button
             variant="primary"
@@ -504,6 +547,9 @@ export function ReceiverPage({
                 </Button>
                 <Button icon={<BellRing size={15} />} onClick={() => test('call')}>
                   Test call
+                </Button>
+                <Button variant="dangerGhost" icon={<VolumeX size={15} />} onClick={stop}>
+                  Stop speaker
                 </Button>
               </div>
               <details className={styles.details}>

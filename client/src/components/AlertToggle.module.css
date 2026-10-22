@@ -1,8 +1,11 @@
 .toggle {
   flex: none;
-  display: grid;
-  place-items: center;
-  width: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 38px;
+  padding: 0 10px;
   height: 38px;
   border-radius: 50%;
   border: 1px solid var(--border-strong);
@@ -15,4 +18,25 @@
 .toggle[data-muted] {
   background: var(--surface-2);
   color: var(--muted);
+}
+.toggle[data-blocked] {
+  border-color: var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning);
+  animation: nudge 1.6s ease-in-out infinite;
+}
+.hint {
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+@keyframes nudge {
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--warning) 25%, transparent);
+  }
+}
+@media (max-width: 560px) {
+  .hint {
+    display: none;
+  }
 }

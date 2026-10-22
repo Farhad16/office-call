@@ -29,8 +29,17 @@ export function onSoundReadyChange(fn: (ready: boolean) => void): () => void {
   return () => listeners.delete(fn);
 }
 
+// When a click last switched sound on (it was blocked before). See justUnlocked().
+let unlockedAt = -Infinity;
+
+/** True right after a click switched sound on, so that same click isn't also used as "mute". */
+export function justUnlocked(): boolean {
+  return performance.now() - unlockedAt < 1000;
+}
+
 /** Creates/resumes the AudioContext. Only works inside a click or key handler. */
 export function unlockSound(): void {
+  if (!soundReady()) unlockedAt = performance.now();
   try {
     if (!ctx) {
       const Ctx =

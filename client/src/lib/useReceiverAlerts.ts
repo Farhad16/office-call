@@ -18,7 +18,7 @@ function loadMuted(): boolean {
 }
 
 /**
- * For receivers: plays a sound and shows a toast for every new request from someone else.
+ * For receivers: plays a sound and shows a toast for every new request.
  * Returns [muted, setMuted]; the choice is remembered on this device.
  */
 export function useReceiverAlerts(user: User, onView: () => void): [boolean, (muted: boolean) => void] {
@@ -66,7 +66,6 @@ export function useReceiverAlerts(user: User, onView: () => void): [boolean, (mu
       .catch(() => {});
 
     const onNew = (request: OfficeRequest) => {
-      if (request.userId === user.id) return; // your own request
       const isCall = request.type === 'call';
       if (!muted && !isSpeakerActive()) {
         if (isCall) playCallSound();
@@ -87,7 +86,7 @@ export function useReceiverAlerts(user: User, onView: () => void): [boolean, (mu
     return () => {
       socket.off('request:new', onNew);
     };
-  }, [enabled, muted, user.id, onView]);
+  }, [enabled, muted, onView]);
 
   return [muted, setMuted];
 }
