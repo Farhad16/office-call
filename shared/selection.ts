@@ -112,6 +112,20 @@ export function validateSelection(input: unknown, catalog: Catalog): Result {
   return { ok: true, value };
 }
 
+/** A drink's name including name-modifier choices, e.g. { label: 'Milk Tea', bn: 'দুধ চা' }. */
+export function drinkName(item: ItemDef, line: DrinkLine, catalog: Catalog): { label: string; bn: string } {
+  let label = item.label;
+  let bn = item.bn;
+  for (const option of itemOptions(item, catalog)) {
+    if (option.kind !== 'choice' || !option.nameModifier) continue;
+    const choice = option.choices.find((c) => c.id === line.options[option.id]);
+    if (!choice) continue;
+    label = `${choice.label} ${label}`;
+    if (choice.bn) bn = `${choice.bn} ${bn}`;
+  }
+  return { label, bn };
+}
+
 /** Human-readable English lines for the on-screen summary. */
 export function summarizeSelection(sel: Selection, catalog: Catalog): string[] {
   const lines: string[] = [];
@@ -122,13 +136,15 @@ export function summarizeSelection(sel: Selection, catalog: Catalog): string[] {
     for (const option of itemOptions(item, catalog)) {
       const v = line.options[option.id];
       if (option.kind === 'choice') {
+        if (option.nameModifier) continue; // already in the name
         const choice = option.choices.find((c) => c.id === v);
         if (choice) details.push(choice.label.toLowerCase());
       } else if (v === true) {
         details.push(`with ${option.label.toLowerCase()}`);
       }
     }
-    lines.push(`${line.qty} × ${item.label}${details.length ? ` (${details.join(', ')})` : ''}`);
+    const name = drinkName(item, line, catalog).label;
+    lines.push(`${line.qty} × ${name}${details.length ? ` (${details.join(', ')})` : ''}`);
   }
   for (const line of sel.snacks) {
     const item = findItem(catalog.snacks, line.itemId);
@@ -161,6 +177,7 @@ export function describeSelection(sel: Selection, catalog: Catalog): { items: De
     for (const option of itemOptions(item, catalog)) {
       const v = line.options[option.id];
       if (option.kind === 'choice') {
+        if (option.nameModifier) continue; // already in the name
         const choice = option.choices.find((c) => c.id === v);
         if (choice) details.push(choice.label);
       } else if (v === true) {
@@ -171,7 +188,7 @@ export function describeSelection(sel: Selection, catalog: Catalog): { items: De
       const text = toggles.length === 1 ? toggles[0] : `${toggles.slice(0, -1).join(', ')} and ${toggles.at(-1)}`;
       details.push(text[0].toUpperCase() + text.slice(1));
     }
-    items.push({ label: item.label, qty: line.qty, details });
+    items.push({ label: drinkName(item, line, catalog).label, qty: line.qty, details });
   }
   for (const line of sel.snacks) {
     const item = findItem(catalog.snacks, line.itemId);

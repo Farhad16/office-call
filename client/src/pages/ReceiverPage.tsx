@@ -60,7 +60,7 @@ const LANGUAGES: { id: VoicePreference; label: string }[] = [
 const HISTORY_LIMIT = 50;
 
 const SAMPLE_ORDER: OfficeRequest['selection'] = {
-  drinks: [{ itemId: 'tea', qty: 1, options: { sugar: 'less', milk: false, ginger: true, lemon: true } }],
+  drinks: [{ itemId: 'tea', qty: 1, options: { teaType: 'black', sugar: 'less', ginger: true, lemon: true } }],
   snacks: [
     { itemId: 'chanachur-makha', qty: 1 },
     { itemId: 'biscuit', qty: 2 },

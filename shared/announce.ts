@@ -1,5 +1,5 @@
 import type { Catalog, DrinkLine, ItemDef, OfficeRequest, SnackLine } from './types.js';
-import { cleanText, findItem, itemOptions } from './selection.js';
+import { cleanText, drinkName, findItem, itemOptions } from './selection.js';
 
 export type AnnounceLanguage = 'bn' | 'en';
 
@@ -75,6 +75,7 @@ function drinkPhrase(line: DrinkLine, catalog: Catalog, w: Words, lang: Announce
   for (const option of itemOptions(item, catalog)) {
     const value = line.options[option.id];
     if (option.kind === 'choice') {
+      if (option.nameModifier) continue; // part of the name ("দুধ চা")
       const choice = option.choices.find((c) => c.id === value);
       const text = choice ? w.choice(choice.bn, choice.label) : '';
       if (text) details.push(text);
@@ -83,7 +84,7 @@ function drinkPhrase(line: DrinkLine, catalog: Catalog, w: Words, lang: Announce
     }
   }
   if (toggles.length) details.push(w.toggles(toggles));
-  return { head: w.count(line.qty, item), details };
+  return { head: w.count(line.qty, { ...item, ...drinkName(item, line, catalog) }), details };
 }
 
 function withDetails(text: string, details: string[]): string {

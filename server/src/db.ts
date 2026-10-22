@@ -75,9 +75,11 @@ const hasColumn = (table: string, column: string) =>
 const hasTable = (table: string) =>
   !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
 
-// Schema version 2 adds the dashboard fields. Older databases are upgraded once.
-const SCHEMA_VERSION = 2;
-if ((db.pragma('user_version', { simple: true }) as number) < SCHEMA_VERSION) {
+// Each upgrade runs once, in order. PRAGMA user_version stores how far a database got.
+const schemaVersion = () => db.pragma('user_version', { simple: true }) as number;
+
+// Version 2 adds the dashboard fields.
+if (schemaVersion() < 2) {
   db.transaction(() => {
     if (!hasColumn('users', 'is_staff')) db.exec('ALTER TABLE users ADD COLUMN is_staff INTEGER NOT NULL DEFAULT 0');
     if (!hasTable('requests')) {
@@ -101,7 +103,46 @@ if ((db.pragma('user_version', { simple: true }) as number) < SCHEMA_VERSION) {
       CREATE INDEX IF NOT EXISTS idx_requests_status_created ON requests(status, created_at);
       CREATE INDEX IF NOT EXISTS idx_requests_completed ON requests(completed_at);
     `);
-    db.pragma(`user_version = ${SCHEMA_VERSION}`);
+    db.pragma('user_version = 2');
+  })();
+}
+
+// Version 3: tea "milk" (yes/no add-on) became a tea type (black / milk). Saved presets and
+// requests are converted, so a milk-tea preset stays milk tea. Milk tea has no ginger/lemon.
+if (schemaVersion() < 3) {
+  type Stored = { drinks?: { itemId: string; options?: Record<string, unknown> }[] };
+  const convert = (json: string): string | null => {
+    const sel = JSON.parse(json) as Stored;
+    let changed = false;
+    for (const drink of sel.drinks ?? []) {
+      const o = drink.options;
+      if (drink.itemId !== 'tea' || !o || !('milk' in o)) continue;
+      const milk = o.milk === true;
+      delete o.milk;
+      o.teaType = milk ? 'milk' : 'black';
+      if (milk) {
+        delete o.ginger;
+        delete o.lemon;
+      }
+      changed = true;
+    }
+    return changed ? JSON.stringify(sel) : null;
+  };
+  db.transaction(() => {
+    for (const table of ['presets', 'requests'] as const) {
+      const rows = db.prepare(`SELECT id, selection FROM ${table} WHERE selection IS NOT NULL`).all() as {
+        id: number;
+        selection: string;
+      }[];
+      // requests: clear search_text so it is rebuilt below with the new names ("milk tea").
+      const extra = table === 'requests' ? ", search_text = ''" : '';
+      const update = db.prepare(`UPDATE ${table} SET selection = ?${extra} WHERE id = ?`);
+      for (const row of rows) {
+        const next = convert(row.selection);
+        if (next) update.run(next, row.id);
+      }
+    }
+    db.pragma('user_version = 3');
   })();
 }
 

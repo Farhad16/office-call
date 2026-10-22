@@ -17,13 +17,24 @@ export const DEFAULT_CATALOG: Catalog = {
         { id: 'extra', label: 'Extra sugar', bn: 'চিনি বেশি' },
       ],
     },
-    milk: { id: 'milk', kind: 'toggle', label: 'Milk', bn: 'দুধ', default: false },
-    ginger: { id: 'ginger', kind: 'toggle', label: 'Ginger', bn: 'আদা', default: false },
-    // Lemon is only offered for tea without milk.
-    lemon: { id: 'lemon', kind: 'toggle', label: 'Lemon', bn: 'লেবু', default: false, showIf: { milk: false } },
+    // Part of the name: spoken as "দুধ চা" / "রং চা" (change রং to লাল if your office says লাল চা).
+    teaType: {
+      id: 'teaType',
+      kind: 'choice',
+      label: 'Type',
+      default: 'black',
+      nameModifier: true,
+      choices: [
+        { id: 'black', label: 'Black', bn: 'রং' },
+        { id: 'milk', label: 'Milk', bn: 'দুধ' },
+      ],
+    },
+    // Ginger and lemon are only offered for black tea (milk tea has neither).
+    ginger: { id: 'ginger', kind: 'toggle', label: 'Ginger', bn: 'আদা', default: false, showIf: { teaType: 'black' } },
+    lemon: { id: 'lemon', kind: 'toggle', label: 'Lemon', bn: 'লেবু', default: false, showIf: { teaType: 'black' } },
   },
   drinks: [
-    { id: 'tea', label: 'Tea', bn: 'চা', emoji: '🍵', maxQty: 5, options: ['sugar', 'milk', 'ginger', 'lemon'] },
+    { id: 'tea', label: 'Tea', bn: 'চা', emoji: '🍵', maxQty: 5, options: ['teaType', 'sugar', 'ginger', 'lemon'] },
     { id: 'black-coffee', label: 'Black Coffee', bn: 'ব্ল্যাক কফি', emoji: '☕', maxQty: 5, options: ['sugar'] },
     { id: 'white-coffee', label: 'White Coffee', bn: 'হোয়াইট কফি', emoji: '🥛', maxQty: 5, options: ['sugar'] },
   ],
