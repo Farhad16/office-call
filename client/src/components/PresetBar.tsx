@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { Bookmark, BookmarkPlus, Pencil, Save, Trash2 } from 'lucide-react';
 import type { Catalog, Preset, Selection, User } from '../../../shared/types.js';
-import { isEmptySelection, sameSelection, validateSelection } from '../../../shared/selection.js';
+import { emptySelection, isEmptySelection, sameSelection, validateSelection } from '../../../shared/selection.js';
 import { cleanName, validateName, MAX_NAME_LENGTH } from '../../../shared/names.js';
 import { deleteJson, errorMessage, getJson, postJson, putJson } from '../lib/api';
 import { Button } from './ui/Button';
@@ -31,9 +31,10 @@ export function PresetBar({ user, catalog, selection, onLoad }: Props) {
   const confirm = useConfirm();
 
   const base = `/api/users/${user.id}/presets`;
-  const active = presets?.find((p) => p.id === activeId) ?? null;
-  const modified = active !== null && !sameSelection(active.selection, selection);
   const canSaveSelection = !isEmptySelection(selection);
+  // An emptied order (e.g. "Clear all") no longer counts as a loaded preset.
+  const active = canSaveSelection ? (presets?.find((p) => p.id === activeId) ?? null) : null;
+  const modified = active !== null && !sameSelection(active.selection, selection);
 
   useEffect(() => {
     getJson<Preset[]>(base)
@@ -64,6 +65,13 @@ export function PresetBar({ user, catalog, selection, onLoad }: Props) {
   }
 
   function load(preset: Preset) {
+    // Tap the loaded preset again: if unchanged, unload it and clear the order;
+    // if changed, fall through and reload it (reset to the saved preset).
+    if (preset.id === active?.id && !modified) {
+      setActiveId(null);
+      onLoad(emptySelection());
+      return;
+    }
     // The catalog may have changed since the preset was saved.
     const result = validateSelection(preset.selection, catalog);
     if (!result.ok) {
@@ -157,7 +165,14 @@ export function PresetBar({ user, catalog, selection, onLoad }: Props) {
             key={preset.id}
             type="button"
             className={styles.chip}
-            aria-pressed={preset.id === activeId}
+            aria-pressed={preset.id === active?.id}
+            title={
+              preset.id !== active?.id
+                ? `Load “${preset.name}”`
+                : modified
+                  ? 'Tap to reset to the saved preset'
+                  : 'Tap again to clear'
+            }
             onClick={() => load(preset)}
             disabled={busy}
           >
