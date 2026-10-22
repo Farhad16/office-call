@@ -1,19 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import {
-  Coffee,
-  ExternalLink,
-  LayoutDashboard,
-  LoaderCircle,
-  Megaphone,
-  RefreshCw,
-  ShoppingBag,
-  WifiOff,
-} from 'lucide-react';
+import { Coffee, LayoutDashboard, LoaderCircle, Megaphone, RefreshCw, ShoppingBag, WifiOff } from 'lucide-react';
 import type { User } from '../../shared/types.js';
 import { NameEntry } from './components/NameEntry';
 import { OrderPage } from './pages/OrderPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { ReceiverPage } from './pages/ReceiverPage';
 import { useRoute } from './lib/route';
 import { clearName, loadName, saveName } from './lib/identity';
 import { errorMessage, patchJson, postJson } from './lib/api';
@@ -67,7 +59,11 @@ export default function App() {
     };
   }, [savedName]);
 
-  // Receivers work on the dashboard only: send them there from the order page.
+  // Set when someone signs in on the standalone speaker page: the in-app speaker then
+  // starts by itself (that click already allowed sound).
+  const [speakerHandoff, setSpeakerHandoff] = useState(false);
+
+  // Receivers don't use the order page: send them to the dashboard.
   const isReceiver = session.status === 'ready' && session.user.isStaff;
   useEffect(() => {
     if (isReceiver && route === 'order') navigate('dashboard', true);
@@ -78,6 +74,22 @@ export default function App() {
     clearName();
     setEditingName(false);
     setSession({ status: 'signed-out' });
+  }
+
+  // /receiver for anyone who is not a signed-in receiver: the standalone speaker page
+  // (office PC before sign-in). It has its own small "Sign in as receiver" form.
+  if (
+    route === 'speaker' &&
+    (session.status === 'signed-out' || (session.status === 'ready' && !session.user.isStaff))
+  ) {
+    return (
+      <ReceiverPage
+        onSignedIn={(signedIn) => {
+          setSpeakerHandoff(true);
+          setSession({ status: 'ready', user: signedIn });
+        }}
+      />
+    );
   }
 
   if (session.status === 'signed-out') {
@@ -166,35 +178,26 @@ export default function App() {
             Office Call
           </span>
           <nav className={styles.tabs} aria-label="Pages">
-            {user.isStaff ? (
-              <>
-                <a href="/dashboard" aria-current="page" onClick={(e) => e.preventDefault()}>
+            {(user.isStaff ? (['dashboard', 'speaker'] as const) : (['order', 'dashboard'] as const)).map((r) => (
+              <a
+                key={r}
+                href={{ order: '/', dashboard: '/dashboard', speaker: '/receiver' }[r]}
+                aria-current={route === r ? 'page' : undefined}
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate(r);
+                }}
+              >
+                {r === 'order' ? (
+                  <ShoppingBag size={16} aria-hidden />
+                ) : r === 'dashboard' ? (
                   <LayoutDashboard size={16} aria-hidden />
-                  <span>Dashboard</span>
-                </a>
-                {/* New tab, so the dashboard keeps running here. */}
-                <a href="/receiver" target="_blank" rel="noopener" title="Open the speaker page in a new tab">
+                ) : (
                   <Megaphone size={16} aria-hidden />
-                  <span>Speaker</span>
-                  <ExternalLink size={12} aria-hidden />
-                </a>
-              </>
-            ) : (
-              (['order', 'dashboard'] as const).map((r) => (
-                <a
-                  key={r}
-                  href={r === 'order' ? '/' : '/dashboard'}
-                  aria-current={route === r ? 'page' : undefined}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigate(r);
-                  }}
-                >
-                  {r === 'order' ? <ShoppingBag size={16} aria-hidden /> : <LayoutDashboard size={16} aria-hidden />}
-                  <span>{r === 'order' ? 'Order' : 'Dashboard'}</span>
-                </a>
-              ))
-            )}
+                )}
+                <span>{{ order: 'Order', dashboard: 'Dashboard', speaker: 'Speaker' }[r]}</span>
+              </a>
+            ))}
           </nav>
           {user.isStaff && <AlertToggle user={user} onView={showDashboard} />}
           <button className={styles.user} onClick={() => setEditingName(true)} title="Profile: change name or role">
@@ -216,7 +219,19 @@ export default function App() {
             <OrderPage key={user.id} user={user} />
           </div>
         )}
-        {(route === 'dashboard' || user.isStaff) && <DashboardPage user={user} />}
+        {user.isStaff ? (
+          <>
+            {/* Both stay mounted, so the speaker keeps announcing while you look at the dashboard. */}
+            <div hidden={route !== 'dashboard'}>
+              <DashboardPage user={user} />
+            </div>
+            <div hidden={route !== 'speaker'}>
+              <ReceiverPage embedded user={user} autoStart={speakerHandoff} onShowDashboard={showDashboard} />
+            </div>
+          </>
+        ) : (
+          route === 'dashboard' && <DashboardPage user={user} />
+        )}
       </main>
     </>
   );

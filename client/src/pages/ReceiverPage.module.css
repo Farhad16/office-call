@@ -394,3 +394,14 @@
   color: var(--danger);
   font-size: 0.85rem;
 }
+
+/* Inside the app shell (receivers): the app header is used, this bar shows the status */
+.embedded {
+  display: grid;
+  gap: 16px;
+}
+.embeddedBar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -4px;
+}

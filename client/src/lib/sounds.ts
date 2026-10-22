@@ -10,6 +10,15 @@ function notify() {
   listeners.forEach((fn) => fn(ready));
 }
 
+// True while an in-app speaker is running; its own chime is enough then.
+let speakerActive = false;
+export function setSpeakerActive(active: boolean) {
+  speakerActive = active;
+}
+export function isSpeakerActive(): boolean {
+  return speakerActive;
+}
+
 export function soundReady(): boolean {
   return ctx?.state === 'running';
 }

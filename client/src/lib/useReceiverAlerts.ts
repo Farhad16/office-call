@@ -4,7 +4,7 @@ import type { Catalog, OfficeRequest, User } from '../../../shared/types.js';
 import { summarizeSelection } from '../../../shared/selection.js';
 import { getJson } from './api';
 import { socket } from './socket';
-import { onSoundReadyChange, playCallSound, playOrderSound, soundReady, unlockSound } from './sounds';
+import { isSpeakerActive, onSoundReadyChange, playCallSound, playOrderSound, soundReady, unlockSound } from './sounds';
 
 const MUTE_KEY = 'officeCall.alertsMuted';
 const UNLOCK_TOAST = 'sound-unlock';
@@ -68,7 +68,7 @@ export function useReceiverAlerts(user: User, onView: () => void): [boolean, (mu
     const onNew = (request: OfficeRequest) => {
       if (request.userId === user.id) return; // your own request
       const isCall = request.type === 'call';
-      if (!muted) {
+      if (!muted && !isSpeakerActive()) {
         if (isCall) playCallSound();
         else playOrderSound();
       }

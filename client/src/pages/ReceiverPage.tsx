@@ -25,6 +25,7 @@ import { buildAnnouncement, type AnnounceLanguage } from '../../../shared/announ
 import { errorMessage, getJson, postJson } from '../lib/api';
 import { loadName, saveName } from '../lib/identity';
 import { useActiveQueue, useStatusChange } from '../lib/useActiveQueue';
+import { setSpeakerActive } from '../lib/sounds';
 import { RequestCard } from '../components/RequestCard';
 import { socket } from '../lib/socket';
 import { AnnouncementQueue } from '../lib/announcementQueue';
@@ -71,7 +72,25 @@ const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const AUTOSTART = new URLSearchParams(window.location.search).get('autostart') === '1';
 let testId = 0; // test announcements use negative ids and are never sent to the server
 
-export function ReceiverPage() {
+type Props = {
+  /** Inside the app shell: no own header or sign-in; uses the app's signed-in user. */
+  embedded?: boolean;
+  user?: User | null;
+  /** Start right away (the user just clicked, e.g. signing in on the standalone page). */
+  autoStart?: boolean;
+  /** Standalone page: called after signing in as a receiver, so the app can take over. */
+  onSignedIn?: (user: User) => void;
+  /** Inside the app: switch to the Dashboard tab (instead of opening a new browser tab). */
+  onShowDashboard?: () => void;
+};
+
+export function ReceiverPage({
+  embedded = false,
+  user: shellUser = null,
+  autoStart = false,
+  onSignedIn,
+  onShowDashboard,
+}: Props) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[] | null>(null);
   const [settings, setSettings] = useState<Settings>(() => readStored(SETTINGS_KEY, DEFAULT_SETTINGS));
@@ -83,17 +102,18 @@ export function ReceiverPage() {
   const [queueRef] = useAutoAnimate<HTMLOListElement>();
 
   // Receiver sign-in (status buttons need one). Reuses the name saved on this PC.
-  const [user, setUser] = useState<User | null>(null);
+  const [localUser, setUser] = useState<User | null>(null);
   const [nameInput, setNameInput] = useState(() => loadName() ?? '');
   const [signInError, setSignInError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
   useEffect(() => {
     const name = loadName();
-    if (!name) return;
+    if (embedded || !name) return;
     postJson<User>('/api/users', { name })
       .then(setUser)
       .catch(() => {});
-  }, []);
+  }, [embedded]);
+  const user = embedded ? shellUser : localUser;
   const receiver = user?.isStaff ? user : null;
 
   // The live work queue (same as the dashboard's Active Queue).
@@ -218,15 +238,30 @@ export function ReceiverPage() {
   const [autoTried, setAutoTried] = useState(false);
   const ready = catalog !== null && voices !== null;
   useEffect(() => {
-    if (!AUTOSTART || autoTried || !ready) return;
+    if (!(AUTOSTART || autoStart) || autoTried || !ready) return;
     const timer = setTimeout(() => {
       setAutoTried(true);
-      start(true);
+      // Hand-over from the standalone page: the user already clicked here, so start
+      // directly. ?autostart=1 (no click yet) first checks that sound is allowed.
+      start(!autoStart);
     }, 0);
     return () => clearTimeout(timer);
     // start only touches refs and state setters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, autoTried]);
+
+  // While the speaker runs, the app's alert chime stays quiet (the speaker chimes itself).
+  useEffect(() => {
+    if (!started) return;
+    setSpeakerActive(true);
+    return () => {
+      setSpeakerActive(false);
+      // Page closed (e.g. standalone → app hand-over): stop mid-sentence speech, so the
+      // request isn't heard twice on top of each other. It is not marked spoken, so the
+      // next speaker announces it again from the start.
+      if (speechSupported) speechSynthesis.cancel();
+    };
+  }, [started]);
 
   // Once started: register as receiver (again after every reconnect) and listen for requests.
   useEffect(() => {
@@ -314,6 +349,7 @@ export function ReceiverPage() {
       const signedIn = await postJson<User>('/api/users', { name, isStaff: true });
       saveName(signedIn.name);
       setUser(signedIn);
+      if (signedIn.isStaff) onSignedIn?.(signedIn);
       setSignInError(null);
       toast.success(`Signed in as ${signedIn.name}`, { description: 'You can now change request status here.' });
     } catch (err) {
@@ -403,6 +439,224 @@ export function ReceiverPage() {
     </span>
   );
 
+  const body = (
+    <>
+      {error && callout('bad', error)}
+
+      {!started ? (
+        <section className={`${styles.startCard} fade-in`}>
+          <span className={styles.startIcon} aria-hidden>
+            <Volume2 size={30} />
+          </span>
+          <h1>Start the speaker</h1>
+          <p className={styles.muted}>
+            Keep this page open on the office computer with the speaker on. Click once to turn on sound.
+          </p>
+          {languagePicker}
+          {voiceInfo}
+          {autoBlocked &&
+            callout(
+              'warn',
+              'The browser blocked automatic sound. Click Start once (or see docs/DEPLOY.md to allow it).',
+            )}
+          <Button
+            variant="primary"
+            size="lg"
+            block
+            icon={<Volume2 size={18} />}
+            onClick={() => start()}
+            disabled={!catalog}
+          >
+            Start speaker
+          </Button>
+        </section>
+      ) : (
+        <div className={styles.grid}>
+          <div className={styles.column}>
+            <section className={`${styles.now} fade-in`} data-speaking={!!speaking || undefined} aria-live="polite">
+              <div className={styles.wave} aria-hidden>
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+              {speaking ? (
+                <>
+                  <p className={styles.nowLabel}>Now speaking</p>
+                  <p className={styles.nowText}>{textOf(speaking.request)}</p>
+                </>
+              ) : (
+                <p className={styles.nowLabel}>Waiting for requests…</p>
+              )}
+              {queued > 0 && <Badge tone="info">{queued} more in queue</Badge>}
+            </section>
+
+            <section className={`${styles.card} reveal`}>
+              <h2>
+                <Settings2 size={17} aria-hidden /> Voice
+              </h2>
+              {languagePicker}
+              {voiceInfo}
+              <div className={styles.controls}>
+                <Button icon={<Play size={15} />} onClick={() => test('order')}>
+                  Test order
+                </Button>
+                <Button icon={<BellRing size={15} />} onClick={() => test('call')}>
+                  Test call
+                </Button>
+              </div>
+              <details className={styles.details}>
+                <summary>
+                  More voice settings <ChevronDown size={16} aria-hidden />
+                </summary>
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>Voice</span>
+                  <select
+                    className="input"
+                    value={settings.voiceURI}
+                    onChange={(e) => setSettings({ ...settings, voiceURI: e.target.value })}
+                  >
+                    <option value="">Automatic ({autoVoice?.name ?? 'none'})</option>
+                    {sortedVoices.map((v) => (
+                      <option key={v.voiceURI} value={v.voiceURI}>
+                        {v.name} ({v.lang})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={styles.field}>
+                  <span className={styles.fieldLabel}>
+                    Speed <span className={styles.muted}>{settings.rate.toFixed(2)}×</span>
+                  </span>
+                  <input
+                    type="range"
+                    className={styles.range}
+                    min={0.6}
+                    max={1.4}
+                    step={0.05}
+                    value={settings.rate}
+                    onChange={(e) => setSettings({ ...settings, rate: Number(e.target.value) })}
+                  />
+                </label>
+                <div className={styles.switches}>
+                  <Switch
+                    checked={settings.chime}
+                    onChange={(chime) => setSettings({ ...settings, chime })}
+                    label="Play a chime first"
+                  />
+                  <Switch
+                    checked={settings.repeat}
+                    onChange={(repeat) => setSettings({ ...settings, repeat })}
+                    label="Say every announcement twice"
+                  />
+                </div>
+              </details>
+            </section>
+          </div>
+
+          <section className={`${styles.card} ${styles.historyCard} fade-in`}>
+            <div className={styles.queueHead}>
+              <h2>
+                <ListChecks size={17} aria-hidden /> Live queue
+                {liveQueue.active && <Badge tone="accent">{liveQueue.active.length}</Badge>}
+              </h2>
+              {embedded && onShowDashboard ? (
+                <a
+                  href="/dashboard"
+                  className={styles.historyLink}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onShowDashboard();
+                  }}
+                >
+                  History
+                </a>
+              ) : (
+                <a href="/dashboard" target="_blank" rel="noopener" className={styles.historyLink}>
+                  History <ExternalLink size={12} aria-hidden />
+                </a>
+              )}
+            </div>
+
+            {receiver ? (
+              <p className={styles.signedIn}>
+                <ShieldCheck size={15} aria-hidden />
+                <span>
+                  Signed in as <strong>{receiver.name}</strong> (receiver)
+                </span>
+                {!embedded && (
+                  <Button size="sm" variant="ghost" onClick={() => setUser(null)}>
+                    Switch
+                  </Button>
+                )}
+              </p>
+            ) : (
+              <form className={styles.signIn} onSubmit={signInAsReceiver} noValidate>
+                <p className={styles.muted}>
+                  {user ? `${user.name} is a sender. ` : ''}Sign in as a receiver to change request status.
+                </p>
+                <div className={styles.signInRow}>
+                  <input
+                    className="input"
+                    value={nameInput}
+                    onChange={(e) => {
+                      setNameInput(e.target.value);
+                      setSignInError(null);
+                    }}
+                    maxLength={MAX_NAME_LENGTH + 10}
+                    placeholder="Your name"
+                    aria-label="Receiver name"
+                  />
+                  <Button type="submit" variant="primary" loading={signingIn} icon={<ShieldCheck size={15} />}>
+                    Sign in as receiver
+                  </Button>
+                </div>
+                {signInError && (
+                  <p className={styles.errorText} role="alert">
+                    {signInError}
+                  </p>
+                )}
+              </form>
+            )}
+
+            {liveQueue.error ? (
+              callout('bad', liveQueue.error)
+            ) : !liveQueue.active || !catalog ? (
+              callout('muted', 'Loading queue…')
+            ) : liveQueue.active.length === 0 ? (
+              <p className={styles.empty}>No active requests. All caught up ☕</p>
+            ) : (
+              <ol ref={queueRef} className={styles.queue}>
+                {liveQueue.active.map((r) => (
+                  <li key={r.id}>
+                    <RequestCard
+                      request={r}
+                      catalog={catalog}
+                      layout="row"
+                      onChangeStatus={receiver ? changeStatus : undefined}
+                      busy={busy.has(r.id)}
+                      extra={speechLabel(r)}
+                    />
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        </div>
+      )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className={styles.embedded}>
+        <div className={styles.embeddedBar}>{statusPill}</div>
+        {body}
+      </div>
+    );
+  }
+
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
@@ -423,197 +677,7 @@ export function ReceiverPage() {
         </div>
       </header>
 
-      <main className={styles.page}>
-        {error && callout('bad', error)}
-
-        {!started ? (
-          <section className={`${styles.startCard} fade-in`}>
-            <span className={styles.startIcon} aria-hidden>
-              <Volume2 size={30} />
-            </span>
-            <h1>Start the speaker</h1>
-            <p className={styles.muted}>
-              Keep this page open on the office computer with the speaker on. Click once to turn on sound.
-            </p>
-            {languagePicker}
-            {voiceInfo}
-            {autoBlocked &&
-              callout(
-                'warn',
-                'The browser blocked automatic sound. Click Start once (or see docs/DEPLOY.md to allow it).',
-              )}
-            <Button
-              variant="primary"
-              size="lg"
-              block
-              icon={<Volume2 size={18} />}
-              onClick={() => start()}
-              disabled={!catalog}
-            >
-              Start speaker
-            </Button>
-          </section>
-        ) : (
-          <div className={styles.grid}>
-            <div className={styles.column}>
-              <section className={`${styles.now} fade-in`} data-speaking={!!speaking || undefined} aria-live="polite">
-                <div className={styles.wave} aria-hidden>
-                  <span />
-                  <span />
-                  <span />
-                  <span />
-                  <span />
-                </div>
-                {speaking ? (
-                  <>
-                    <p className={styles.nowLabel}>Now speaking</p>
-                    <p className={styles.nowText}>{textOf(speaking.request)}</p>
-                  </>
-                ) : (
-                  <p className={styles.nowLabel}>Waiting for requests…</p>
-                )}
-                {queued > 0 && <Badge tone="info">{queued} more in queue</Badge>}
-              </section>
-
-              <section className={`${styles.card} reveal`}>
-                <h2>
-                  <Settings2 size={17} aria-hidden /> Voice
-                </h2>
-                {languagePicker}
-                {voiceInfo}
-                <div className={styles.controls}>
-                  <Button icon={<Play size={15} />} onClick={() => test('order')}>
-                    Test order
-                  </Button>
-                  <Button icon={<BellRing size={15} />} onClick={() => test('call')}>
-                    Test call
-                  </Button>
-                </div>
-                <details className={styles.details}>
-                  <summary>
-                    More voice settings <ChevronDown size={16} aria-hidden />
-                  </summary>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>Voice</span>
-                    <select
-                      className="input"
-                      value={settings.voiceURI}
-                      onChange={(e) => setSettings({ ...settings, voiceURI: e.target.value })}
-                    >
-                      <option value="">Automatic ({autoVoice?.name ?? 'none'})</option>
-                      {sortedVoices.map((v) => (
-                        <option key={v.voiceURI} value={v.voiceURI}>
-                          {v.name} ({v.lang})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>
-                      Speed <span className={styles.muted}>{settings.rate.toFixed(2)}×</span>
-                    </span>
-                    <input
-                      type="range"
-                      className={styles.range}
-                      min={0.6}
-                      max={1.4}
-                      step={0.05}
-                      value={settings.rate}
-                      onChange={(e) => setSettings({ ...settings, rate: Number(e.target.value) })}
-                    />
-                  </label>
-                  <div className={styles.switches}>
-                    <Switch
-                      checked={settings.chime}
-                      onChange={(chime) => setSettings({ ...settings, chime })}
-                      label="Play a chime first"
-                    />
-                    <Switch
-                      checked={settings.repeat}
-                      onChange={(repeat) => setSettings({ ...settings, repeat })}
-                      label="Say every announcement twice"
-                    />
-                  </div>
-                </details>
-              </section>
-            </div>
-
-            <section className={`${styles.card} ${styles.historyCard} fade-in`}>
-              <div className={styles.queueHead}>
-                <h2>
-                  <ListChecks size={17} aria-hidden /> Live queue
-                  {liveQueue.active && <Badge tone="accent">{liveQueue.active.length}</Badge>}
-                </h2>
-                <a href="/dashboard" target="_blank" rel="noopener" className={styles.historyLink}>
-                  History <ExternalLink size={12} aria-hidden />
-                </a>
-              </div>
-
-              {receiver ? (
-                <p className={styles.signedIn}>
-                  <ShieldCheck size={15} aria-hidden />
-                  <span>
-                    Signed in as <strong>{receiver.name}</strong> (receiver)
-                  </span>
-                  <Button size="sm" variant="ghost" onClick={() => setUser(null)}>
-                    Switch
-                  </Button>
-                </p>
-              ) : (
-                <form className={styles.signIn} onSubmit={signInAsReceiver} noValidate>
-                  <p className={styles.muted}>
-                    {user ? `${user.name} is a sender. ` : ''}Sign in as a receiver to change request status.
-                  </p>
-                  <div className={styles.signInRow}>
-                    <input
-                      className="input"
-                      value={nameInput}
-                      onChange={(e) => {
-                        setNameInput(e.target.value);
-                        setSignInError(null);
-                      }}
-                      maxLength={MAX_NAME_LENGTH + 10}
-                      placeholder="Your name"
-                      aria-label="Receiver name"
-                    />
-                    <Button type="submit" variant="primary" loading={signingIn} icon={<ShieldCheck size={15} />}>
-                      Sign in as receiver
-                    </Button>
-                  </div>
-                  {signInError && (
-                    <p className={styles.errorText} role="alert">
-                      {signInError}
-                    </p>
-                  )}
-                </form>
-              )}
-
-              {liveQueue.error ? (
-                callout('bad', liveQueue.error)
-              ) : !liveQueue.active || !catalog ? (
-                callout('muted', 'Loading queue…')
-              ) : liveQueue.active.length === 0 ? (
-                <p className={styles.empty}>No active requests. All caught up ☕</p>
-              ) : (
-                <ol ref={queueRef} className={styles.queue}>
-                  {liveQueue.active.map((r) => (
-                    <li key={r.id}>
-                      <RequestCard
-                        request={r}
-                        catalog={catalog}
-                        layout="row"
-                        onChangeStatus={receiver ? changeStatus : undefined}
-                        busy={busy.has(r.id)}
-                        extra={speechLabel(r)}
-                      />
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </section>
-          </div>
-        )}
-      </main>
+      <main className={styles.page}>{body}</main>
     </div>
   );
 }

@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { withTransition } from './transition';
 
-export type Route = 'order' | 'dashboard';
+export type Route = 'order' | 'dashboard' | 'speaker';
 
-const routeOf = (path: string): Route => (path.replace(/\/+$/, '') === '/dashboard' ? 'dashboard' : 'order');
-const pathOf = (route: Route) => (route === 'dashboard' ? '/dashboard' : '/');
+const PATHS: Record<Route, string> = { order: '/', dashboard: '/dashboard', speaker: '/receiver' };
+const routeOf = (path: string): Route => {
+  const clean = path.replace(/\/+$/, '');
+  return clean === '/dashboard' ? 'dashboard' : clean === '/receiver' ? 'speaker' : 'order';
+};
+const pathOf = (route: Route) => PATHS[route];
 
-/** Tiny router for two pages: / and /dashboard. Back/forward buttons work. */
+/** Tiny router: / (order), /dashboard, /receiver (speaker). Back/forward buttons work. */
 export function useRoute(): [Route, (route: Route, replace?: boolean) => void] {
   const [route, setRoute] = useState<Route>(() => routeOf(window.location.pathname));
   useEffect(() => {

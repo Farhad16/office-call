@@ -46,6 +46,11 @@ npm run dev
 
 ## Speaker page (office PC)
 
+Receivers have two tabs in the app: **Dashboard** and **Speaker**. Both stay loaded, so the
+speaker keeps announcing while you look at the dashboard. `/receiver` also works on its
+own before anyone signs in (office PC at boot); signing in as a receiver there switches
+to the app and the speaker keeps running.
+
 1. On the office computer, open **Google Chrome** at `http://localhost:3000/receiver`
    (dev: `http://localhost:5173/receiver`). Plug in the speaker.
 2. Click **🔊 Start speaker** once. Browsers block sound until you click on the page.

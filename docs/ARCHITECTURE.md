@@ -100,8 +100,13 @@ requests. (In code and the database this is `isStaff` / `users.is_staff`.)
 | Delete someone else's order | ❌                    | ✅ only if Done   |
 
 - **Delete erases the order permanently.** It can't be undone.
-- Receivers don't use the Order page: `/` redirects them to `/dashboard`, and the header
-  shows Dashboard plus a link to the speaker page (`/receiver`, new tab).
+- Receivers don't use the Order page: `/` redirects them to `/dashboard`. Their header tabs
+  are **Dashboard** (`/dashboard`) and **Speaker** (`/receiver`). Both pages stay mounted,
+  so speech continues on the Dashboard tab; while the speaker runs, the alert chime is
+  skipped (the speaker chimes itself).
+- `/receiver` for anyone who isn't a signed-in receiver shows the standalone speaker page
+  with its own sign-in. Signing in there hands over to the app; the in-app speaker starts
+  by itself and repeats any request that was cut off mid-sentence.
 - Receivers get an **alert** for every new request from someone else, on any page of the
   app: a toast plus a sound (`client/src/lib/sounds.ts`, Web Audio, no files). Order =
   two-note chime, Call Staff = triple ring. The mute button is remembered per device.
