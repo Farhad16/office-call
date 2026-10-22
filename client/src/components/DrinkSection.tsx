@@ -11,6 +11,7 @@ import {
   visibleValues,
 } from '../../../shared/selection.js';
 import { QtyStepper } from './QtyStepper';
+import { AnimatedHeight } from './ui/AnimatedHeight';
 import { Segmented } from './ui/Segmented';
 import styles from './sections.module.css';
 
@@ -81,18 +82,21 @@ export function DrinkSection({ catalog, value, onChange }: Props) {
         ))}
       </div>
 
-      <div ref={linesRef} className={styles.drinkLines}>
-        {sorted(value).map((line) => (
-          <DrinkLineEditor
-            key={keyOf(line)}
-            catalog={catalog}
-            line={line}
-            label={variants.find((v) => v.key === keyOf(line))?.label ?? line.itemId}
-            onChange={(next) => update(keyOf(line), next)}
-            onRemove={() => toggle(keyOf(line))}
-          />
-        ))}
-      </div>
+      {/* Smooth height change when drinks are added or removed: nothing below jumps. */}
+      <AnimatedHeight>
+        <div ref={linesRef} className={styles.drinkLines}>
+          {sorted(value).map((line) => (
+            <DrinkLineEditor
+              key={keyOf(line)}
+              catalog={catalog}
+              line={line}
+              label={variants.find((v) => v.key === keyOf(line))?.label ?? line.itemId}
+              onChange={(next) => update(keyOf(line), next)}
+              onRemove={() => toggle(keyOf(line))}
+            />
+          ))}
+        </div>
+      </AnimatedHeight>
     </section>
   );
 }

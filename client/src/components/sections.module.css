@@ -274,7 +274,7 @@
   gap: 10px;
 }
 .drinkLines:not(:empty) {
-  margin-top: 14px;
+  padding-top: 14px;
 }
 .drinkLine {
   display: grid;
