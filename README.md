@@ -28,6 +28,15 @@ npm start                          # prints the addresses for phones
 
 For start-at-boot, HTTPS and installing the app on phones, follow [docs/DEPLOY.md](docs/DEPLOY.md).
 
+## Ordering (senders)
+
+- **Drinks:** one tile per drink, including Black Tea and Milk Tea. One tap adds it, another
+  removes it; pick several. Each picked drink has its own sugar / add-ons / cups row.
+- **Presets:** cards show what is inside. Tap to add a preset to the order, tap again to take
+  it out; pick several to combine them. The pencil on a card renames, updates or deletes it.
+- **Note:** type extra requests in the "Add a note" field right above **Send Request**
+  (always on screen; Enter sends).
+
 ## Requirements
 
 - Node.js 20+ (`node -v`)

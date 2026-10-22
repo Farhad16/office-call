@@ -11,7 +11,7 @@
   border-bottom: 1px solid var(--border);
 }
 .headerInner {
-  max-width: 1120px;
+  max-width: 1400px;
   min-height: var(--header-h);
   margin: 0 auto;
   padding: 8px 16px;
@@ -82,7 +82,7 @@
 }
 
 .page {
-  max-width: 1120px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 20px 16px 40px;
   display: grid;

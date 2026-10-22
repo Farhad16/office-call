@@ -25,8 +25,8 @@ export const DEFAULT_CATALOG: Catalog = {
       default: 'black',
       nameModifier: true,
       choices: [
-        { id: 'black', label: 'Black', bn: 'রং' },
-        { id: 'milk', label: 'Milk', bn: 'দুধ' },
+        { id: 'black', label: 'Black', bn: 'রং', emoji: '🍵' },
+        { id: 'milk', label: 'Milk', bn: 'দুধ', emoji: '🧋' },
       ],
     },
     // Ginger and lemon are only offered for black tea (milk tea has neither).

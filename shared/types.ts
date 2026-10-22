@@ -6,7 +6,7 @@ export type ChoiceOption = {
   kind: 'choice';
   label: string;
   default: string;
-  choices: { id: string; label: string; bn: string }[]; // bn '' = say nothing (the normal case)
+  choices: { id: string; label: string; bn: string; emoji?: string }[]; // bn '' = say nothing (the normal case)
   showIf?: Record<string, string | boolean>; // only shown when other options have these values
   /** The chosen value becomes part of the drink's name: "Milk Tea" / "দুধ চা". */
   nameModifier?: boolean;

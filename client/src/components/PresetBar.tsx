@@ -1,9 +1,15 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
-import { Bookmark, BookmarkPlus, Pencil, Save, Trash2 } from 'lucide-react';
+import { Bookmark, BookmarkPlus, Check, Pencil, RefreshCw, Trash2, X } from 'lucide-react';
 import type { Catalog, Preset, Selection, User } from '../../../shared/types.js';
-import { emptySelection, isEmptySelection, sameSelection, validateSelection } from '../../../shared/selection.js';
+import {
+  addSelections,
+  isEmptySelection,
+  subtractSelection,
+  summarizeSelection,
+  validateSelection,
+} from '../../../shared/selection.js';
 import { cleanName, validateName, MAX_NAME_LENGTH } from '../../../shared/names.js';
 import { deleteJson, errorMessage, getJson, postJson, putJson } from '../lib/api';
 import { Button } from './ui/Button';
@@ -14,27 +20,32 @@ type Props = {
   user: User;
   catalog: Catalog;
   selection: Selection;
-  onLoad: (selection: Selection) => void;
+  onChange: (selection: Selection) => void;
 };
 
 type Form = { mode: 'create' } | { mode: 'rename'; preset: Preset } | null;
 
-export function PresetBar({ user, catalog, selection, onLoad }: Props) {
+/**
+ * Preset cards that show what's inside. Several can be picked: tapping a card adds its
+ * items to the order, tapping it again takes them back out.
+ */
+export function PresetBar({ user, catalog, selection, onChange }: Props) {
   const [presets, setPresets] = useState<Preset[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState<number | null>(null);
+  const [pickedIds, setPickedIds] = useState<Set<number>>(new Set());
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<Form>(null);
   const [formName, setFormName] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [chipsRef] = useAutoAnimate<HTMLDivElement>();
+  const [gridRef] = useAutoAnimate<HTMLDivElement>();
   const confirm = useConfirm();
 
   const base = `/api/users/${user.id}/presets`;
-  const canSaveSelection = !isEmptySelection(selection);
-  // An emptied order (e.g. "Clear all") no longer counts as a loaded preset.
-  const active = canSaveSelection ? (presets?.find((p) => p.id === activeId) ?? null) : null;
-  const modified = active !== null && !sameSelection(active.selection, selection);
+  const orderEmpty = isEmptySelection(selection);
+  // An emptied order (Clear all, or after sending) means nothing is picked any more.
+  const picked = orderEmpty ? new Set<number>() : pickedIds;
+  const editing = presets?.find((p) => p.id === editingId) ?? null;
 
   useEffect(() => {
     getJson<Preset[]>(base)
@@ -42,7 +53,6 @@ export function PresetBar({ user, catalog, selection, onLoad }: Props) {
       .catch((err) => setLoadError(`Could not load presets: ${errorMessage(err)}`));
   }, [base]);
 
-  /** Runs a server call with busy + error toast. Returns true on success. */
   async function run(action: () => Promise<void>): Promise<boolean> {
     if (busy) return false;
     setBusy(true);
@@ -57,19 +67,19 @@ export function PresetBar({ user, catalog, selection, onLoad }: Props) {
     }
   }
 
-  function sortByName(list: Preset[]) {
-    return [...list].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-  }
-  function replace(updated: Preset) {
+  const sortByName = (list: Preset[]) =>
+    [...list].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  const replace = (updated: Preset) =>
     setPresets((list) => sortByName((list ?? []).map((p) => (p.id === updated.id ? updated : p))));
-  }
 
-  function load(preset: Preset) {
-    // Tap the loaded preset again: if unchanged, unload it and clear the order;
-    // if changed, fall through and reload it (reset to the saved preset).
-    if (preset.id === active?.id && !modified) {
-      setActiveId(null);
-      onLoad(emptySelection());
+  function toggle(preset: Preset) {
+    if (picked.has(preset.id)) {
+      onChange(subtractSelection(selection, preset.selection, catalog));
+      setPickedIds((s) => {
+        const next = new Set(s);
+        next.delete(preset.id);
+        return next;
+      });
       return;
     }
     // The catalog may have changed since the preset was saved.
@@ -78,8 +88,8 @@ export function PresetBar({ user, catalog, selection, onLoad }: Props) {
       toast.error(`“${preset.name}” uses items that no longer exist`, { description: 'Delete it and save a new one.' });
       return;
     }
-    setActiveId(preset.id);
-    onLoad(result.value);
+    onChange(addSelections(orderEmpty ? { drinks: [], snacks: [], custom: '' } : selection, result.value, catalog));
+    setPickedIds((s) => new Set(orderEmpty ? [] : s).add(preset.id));
   }
 
   function openForm(next: Form) {
@@ -100,38 +110,44 @@ export function PresetBar({ user, catalog, selection, onLoad }: Props) {
       if (form?.mode === 'create') {
         const created = await postJson<Preset>(base, { name, selection });
         setPresets((list) => sortByName([...(list ?? []), created]));
-        setActiveId(created.id);
         toast.success(`Saved preset “${created.name}”`);
       } else if (form?.mode === 'rename') {
         replace(await putJson<Preset>(`${base}/${form.preset.id}`, { name, selection: form.preset.selection }));
         toast.success(`Renamed to “${name}”`);
       }
     });
-    if (ok) setForm(null);
+    if (ok) {
+      setForm(null);
+      setEditingId(null);
+    }
   }
 
-  function saveChanges() {
-    if (!active) return;
+  function updateWithOrder(preset: Preset) {
     run(async () => {
-      replace(await putJson<Preset>(`${base}/${active.id}`, { name: active.name, selection }));
-      toast.success(`Updated “${active.name}”`);
+      replace(await putJson<Preset>(`${base}/${preset.id}`, { name: preset.name, selection }));
+      setEditingId(null);
+      toast.success(`Updated “${preset.name}” with your current order`);
     });
   }
 
-  async function remove() {
-    if (!active) return;
+  async function remove(preset: Preset) {
     const ok = await confirm({
-      title: `Delete “${active.name}”?`,
+      title: `Delete “${preset.name}”?`,
       description: 'This preset will be removed from all your devices.',
       confirmLabel: 'Delete',
       danger: true,
     });
     if (!ok) return;
     run(async () => {
-      await deleteJson(`${base}/${active.id}`);
-      setPresets((list) => (list ?? []).filter((p) => p.id !== active.id));
-      setActiveId(null);
-      toast.success(`Deleted “${active.name}”`);
+      await deleteJson(`${base}/${preset.id}`);
+      setPresets((list) => (list ?? []).filter((p) => p.id !== preset.id));
+      setPickedIds((s) => {
+        const next = new Set(s);
+        next.delete(preset.id);
+        return next;
+      });
+      setEditingId(null);
+      toast.success(`Deleted “${preset.name}”`);
     });
   }
 
@@ -141,70 +157,96 @@ export function PresetBar({ user, catalog, selection, onLoad }: Props) {
         <h2 id="presets-title">
           <Bookmark size={16} aria-hidden /> My presets
         </h2>
-        {!form && canSaveSelection && (
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<BookmarkPlus size={15} />}
-            onClick={() => openForm({ mode: 'create' })}
-          >
-            Save current as preset
-          </Button>
-        )}
+        <span className={styles.hint}>Tap to add · tap again to remove · pick several</span>
       </div>
 
       {loadError && <p className={styles.error}>{loadError}</p>}
       {presets === null && !loadError && <div className={styles.skeleton} aria-label="Loading presets" />}
-      {presets?.length === 0 && !form && (
-        <p className={styles.muted}>No presets yet. Pick items below, then save them for one-tap ordering.</p>
-      )}
 
-      <div ref={chipsRef} className={styles.chips}>
-        {presets?.map((preset) => (
+      <div ref={gridRef} className={styles.grid}>
+        {presets?.map((preset) => {
+          const on = picked.has(preset.id);
+          const lines = summarizeSelection(preset.selection, catalog);
+          return (
+            <div key={preset.id} className={styles.card} data-on={on || undefined}>
+              <button
+                type="button"
+                className={styles.cardMain}
+                aria-pressed={on}
+                onClick={() => toggle(preset)}
+                disabled={busy}
+                title={on ? 'Tap to remove from the order' : 'Tap to add to the order'}
+              >
+                <span className={styles.cardTop}>
+                  <span className={styles.cardName}>{preset.name}</span>
+                  <span className={styles.check} aria-hidden>
+                    {on && <Check size={13} strokeWidth={3} />}
+                  </span>
+                </span>
+                <span className={styles.contents}>
+                  {lines.slice(0, 3).map((l) => (
+                    <span key={l}>{l}</span>
+                  ))}
+                  {lines.length > 3 && <span>+{lines.length - 3} more</span>}
+                </span>
+              </button>
+              <button
+                type="button"
+                className={styles.editButton}
+                onClick={() => {
+                  setForm(null);
+                  setEditingId(editingId === preset.id ? null : preset.id);
+                }}
+                aria-label={`Edit preset ${preset.name}`}
+                aria-expanded={editingId === preset.id}
+                title="Edit"
+              >
+                <Pencil size={13} />
+              </button>
+            </div>
+          );
+        })}
+
+        {!form && (
           <button
-            key={preset.id}
             type="button"
-            className={styles.chip}
-            aria-pressed={preset.id === active?.id}
-            title={
-              preset.id !== active?.id
-                ? `Load “${preset.name}”`
-                : modified
-                  ? 'Tap to reset to the saved preset'
-                  : 'Tap again to clear'
-            }
-            onClick={() => load(preset)}
-            disabled={busy}
+            className={styles.addCard}
+            onClick={() => openForm({ mode: 'create' })}
+            disabled={orderEmpty}
+            title={orderEmpty ? 'Pick items first, then save them as a preset' : 'Save the current order as a preset'}
           >
-            {preset.name}
+            <BookmarkPlus size={18} aria-hidden />
+            <span>{orderEmpty ? 'Pick items to save a preset' : 'Save current order'}</span>
           </button>
-        ))}
+        )}
       </div>
 
-      {active && !form && (
-        <div className={`${styles.activeRow} fade-in`}>
-          <span className={styles.muted}>
-            Loaded <strong>{active.name}</strong>
-            {modified && <span className={styles.changed}> · changed</span>}
-          </span>
-          <span className={styles.actions}>
-            {modified && canSaveSelection && (
-              <Button size="sm" variant="primary" icon={<Save size={14} />} onClick={saveChanges} loading={busy}>
-                Save changes
-              </Button>
-            )}
-            <Button
-              size="sm"
-              icon={<Pencil size={14} />}
-              onClick={() => openForm({ mode: 'rename', preset: active })}
-              disabled={busy}
-            >
-              Rename
-            </Button>
-            <Button size="sm" variant="dangerGhost" icon={<Trash2 size={14} />} onClick={remove} disabled={busy}>
-              Delete
-            </Button>
-          </span>
+      {editing && !form && (
+        <div className={`${styles.manage} fade-in`}>
+          <span className={styles.manageName}>{editing.name}</span>
+          <Button size="sm" icon={<Pencil size={14} />} onClick={() => openForm({ mode: 'rename', preset: editing })}>
+            Rename
+          </Button>
+          <Button
+            size="sm"
+            icon={<RefreshCw size={14} />}
+            onClick={() => updateWithOrder(editing)}
+            disabled={orderEmpty}
+            loading={busy}
+            title={orderEmpty ? 'Your order is empty' : 'Replace this preset with your current order'}
+          >
+            Update with current order
+          </Button>
+          <Button size="sm" variant="dangerGhost" icon={<Trash2 size={14} />} onClick={() => remove(editing)}>
+            Delete
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<X size={14} />}
+            onClick={() => setEditingId(null)}
+            aria-label="Close"
+          />
         </div>
       )}
 

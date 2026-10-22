@@ -36,18 +36,24 @@
   grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   gap: 10px;
 }
+
 @media (max-width: 560px) {
+  /* all four drinks in one row */
   .grid {
-    gap: 8px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
   }
   .tile {
-    padding: 12px 6px;
-    font-size: 0.85rem;
+    padding: 10px 4px;
+    gap: 6px;
+    font-size: 0.78rem;
+    line-height: 1.2;
+    text-align: center;
   }
   .tile .emoji {
-    width: 40px;
-    height: 40px;
-    font-size: 1.35rem;
+    width: 36px;
+    height: 36px;
+    font-size: 1.25rem;
   }
 }
 .tile {
@@ -174,12 +180,9 @@
   margin: 0;
   padding: 0;
   display: grid;
+  /* As many columns as fit (1 in the narrow half-width card, 2 on tablets) */
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 8px;
-}
-@media (min-width: 640px) {
-  .snacks {
-    grid-template-columns: 1fr 1fr;
-  }
 }
 .snack {
   display: flex;
@@ -259,4 +262,69 @@
   color: var(--muted);
   font-size: 0.78rem;
   margin: 6px 0 0;
+}
+
+.headHint {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+/* One row per picked drink */
+.drinkLines {
+  display: grid;
+  gap: 10px;
+}
+.drinkLines:not(:empty) {
+  margin-top: 14px;
+}
+.drinkLine {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+}
+.drinkLineHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.drinkLineHead strong {
+  flex: 1;
+  font-size: 0.95rem;
+}
+.remove {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+}
+.remove:hover {
+  background: var(--surface);
+  color: var(--danger);
+}
+.drinkLineOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+}
+.optGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.optLabel {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.drinkLine :global([role='radiogroup']) {
+  background: var(--surface);
 }

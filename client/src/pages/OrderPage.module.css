@@ -1,17 +1,20 @@
 /* Phones: one column, summary stuck to the bottom. Desktop: summary panel on the right. */
 .layout {
   display: grid;
+  /* minmax(0, …): swipeable rows inside must not stretch the page wider than the screen */
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
 }
 @media (min-width: 960px) {
   .layout {
-    grid-template-columns: minmax(0, 1fr) 360px;
+    grid-template-columns: minmax(0, 1fr) 380px;
     align-items: start;
     gap: 28px;
   }
 }
 .main {
   display: grid;
+  grid-template-columns: minmax(0, 1fr); /* swipe rows inside must not widen the column */
   gap: 16px;
   min-width: 0;
 }
@@ -54,4 +57,17 @@
   border-radius: 50%;
   background: var(--danger-soft);
   color: var(--danger);
+}
+
+/* Drinks and snacks side by side on wide screens */
+.menu {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (min-width: 1200px) {
+  .menu {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  }
 }

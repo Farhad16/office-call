@@ -1,4 +1,5 @@
 .panel {
+  min-width: 0;
   position: sticky;
   bottom: 0;
   z-index: 10;
@@ -47,9 +48,9 @@
   font-size: 0.75rem;
 }
 .body {
-  max-height: 26vh;
+  max-height: 22vh;
   overflow-y: auto;
-  margin: 6px 0 12px;
+  margin: 6px 0 10px;
 }
 @media (min-width: 960px) {
   .body {
@@ -75,4 +76,79 @@
   background: var(--surface-2);
   font-size: 0.92rem;
   overflow-wrap: anywhere;
+}
+
+/* Note: an inline field right above Send */
+.note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  margin-bottom: 10px;
+  padding: 0 6px 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--muted);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.note:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+.note input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--text);
+}
+.note input:focus-visible {
+  box-shadow: none;
+}
+.noteClear {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+}
+.noteClear:hover {
+  background: var(--surface-2);
+}
+
+/* Phones: items as one swipeable row of chips, so the bar stays short */
+@media (max-width: 959px) {
+  .body {
+    max-height: none;
+    margin: 4px 0 8px;
+  }
+  .lines {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .lines::-webkit-scrollbar {
+    display: none;
+  }
+  .lines li {
+    flex: none;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+  .head {
+    min-height: 28px;
+  }
+  .empty {
+    font-size: 0.85rem;
+  }
 }

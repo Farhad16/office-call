@@ -8,7 +8,6 @@ import { newRequestId } from '../lib/ids';
 import { socket, useConnection } from '../lib/socket';
 import { DrinkSection } from '../components/DrinkSection';
 import { SnackSection } from '../components/SnackSection';
-import { CustomSection } from '../components/CustomSection';
 import { RequestSummary } from '../components/RequestSummary';
 import { PresetBar } from '../components/PresetBar';
 import { ConnectionStatus } from '../components/ConnectionStatus';
@@ -60,7 +59,11 @@ export function OrderPage({ user }: { user: User }) {
     return () => clearTimeout(timer);
   }, [cooldown]);
 
-  const summary = useMemo(() => (catalog ? summarizeSelection(selection, catalog) : []), [selection, catalog]);
+  // Drinks and snacks only: the note is shown and edited in its own field.
+  const summary = useMemo(
+    () => (catalog ? summarizeSelection({ ...selection, custom: '' }, catalog) : []),
+    [selection, catalog],
+  );
 
   function retryCatalog() {
     setLoadError(null);
@@ -142,23 +145,26 @@ export function OrderPage({ user }: { user: User }) {
           </Button>
         </div>
 
-        <PresetBar user={user} catalog={catalog} selection={selection} onLoad={setSelection} />
+        <PresetBar user={user} catalog={catalog} selection={selection} onChange={setSelection} />
 
-        <DrinkSection
-          catalog={catalog}
-          value={selection.drinks[0] ?? null}
-          onChange={(drink) => setSelection((s) => ({ ...s, drinks: drink ? [drink] : [] }))}
-        />
-        <SnackSection
-          catalog={catalog}
-          value={selection.snacks}
-          onChange={(snacks) => setSelection((s) => ({ ...s, snacks }))}
-        />
-        <CustomSection value={selection.custom} onChange={(custom) => setSelection((s) => ({ ...s, custom }))} />
+        <div className={styles.menu}>
+          <DrinkSection
+            catalog={catalog}
+            value={selection.drinks}
+            onChange={(drinks) => setSelection((s) => ({ ...s, drinks }))}
+          />
+          <SnackSection
+            catalog={catalog}
+            value={selection.snacks}
+            onChange={(snacks) => setSelection((s) => ({ ...s, snacks }))}
+          />
+        </div>
       </div>
 
       <RequestSummary
         lines={summary}
+        note={selection.custom}
+        onNoteChange={(custom) => setSelection((s) => ({ ...s, custom }))}
         sending={sending === 'order'}
         sent={cooldown === 'order'}
         disabled={sending !== null || cooldown === 'order'}

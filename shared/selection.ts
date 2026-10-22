@@ -1,4 +1,4 @@
-import type { Catalog, DrinkLine, ItemDef, OptionDef, OptionValue, Selection } from './types.js';
+import type { Catalog, DrinkLine, ItemDef, OptionDef, OptionValue, Selection, SnackLine } from './types.js';
 
 export const CUSTOM_MAX_LENGTH = 200;
 
@@ -195,4 +195,105 @@ export function describeSelection(sel: Selection, catalog: Catalog): { items: De
     if (item) items.push({ label: item.label, qty: line.qty, details: [] });
   }
   return { items, custom: cleanText(sel.custom) };
+}
+
+// ---------- Drink variants (one tile each) ----------
+
+/**
+ * A pickable drink tile. A drink with a name-modifier option becomes one tile per choice
+ * ("Black Tea", "Milk Tea"), so the type is picked with the same tap as the drink.
+ */
+export type DrinkVariant = {
+  key: string; // 'tea:milk' or 'black-coffee'
+  item: ItemDef;
+  label: string;
+  emoji: string;
+  fixed: Record<string, OptionValue>; // option values set by the tile itself
+};
+
+function modifierOption(item: ItemDef, catalog: Catalog) {
+  return itemOptions(item, catalog).find((o) => o.kind === 'choice' && o.nameModifier);
+}
+
+export function drinkVariants(catalog: Catalog): DrinkVariant[] {
+  const variants: DrinkVariant[] = [];
+  for (const item of catalog.drinks) {
+    const mod = modifierOption(item, catalog);
+    if (mod?.kind === 'choice') {
+      for (const choice of mod.choices) {
+        variants.push({
+          key: `${item.id}:${choice.id}`,
+          item,
+          label: `${choice.label} ${item.label}`,
+          emoji: choice.emoji ?? item.emoji,
+          fixed: { [mod.id]: choice.id },
+        });
+      }
+    } else {
+      variants.push({ key: item.id, item, label: item.label, emoji: item.emoji, fixed: {} });
+    }
+  }
+  return variants;
+}
+
+/** Which tile a drink line belongs to. */
+export function variantKeyOf(line: DrinkLine, catalog: Catalog): string {
+  const item = findItem(catalog.drinks, line.itemId);
+  const mod = item && modifierOption(item, catalog);
+  if (!mod) return line.itemId;
+  return `${line.itemId}:${line.options[mod.id] ?? mod.default}`;
+}
+
+export function newVariantLine(variant: DrinkVariant, catalog: Catalog): DrinkLine {
+  const base = newDrinkLine(variant.item, catalog);
+  return { ...base, options: visibleValues(variant.item, { ...base.options, ...variant.fixed }, catalog) };
+}
+
+// ---------- Combining presets ----------
+
+const maxQtyOf = (list: ItemDef[], id: string) => findItem(list, id)?.maxQty ?? 1;
+
+/** Adds `extra` to `base` (used when picking a preset): same drinks/snacks add up. */
+export function addSelections(base: Selection, extra: Selection, catalog: Catalog): Selection {
+  const drinks = base.drinks.map((d) => ({ ...d, options: { ...d.options } }));
+  for (const line of extra.drinks) {
+    const key = variantKeyOf(line, catalog);
+    const same = drinks.find((d) => variantKeyOf(d, catalog) === key);
+    if (same) same.qty = Math.min(same.qty + line.qty, maxQtyOf(catalog.drinks, line.itemId));
+    else drinks.push({ ...line, options: { ...line.options } });
+  }
+  const snacks: SnackLine[] = base.snacks.map((s) => ({ ...s }));
+  for (const line of extra.snacks) {
+    const same = snacks.find((s) => s.itemId === line.itemId);
+    if (same) same.qty = Math.min(same.qty + line.qty, maxQtyOf(catalog.snacks, line.itemId));
+    else snacks.push({ ...line });
+  }
+  const order = catalog.snacks.map((s) => s.id);
+  snacks.sort((a, b) => order.indexOf(a.itemId) - order.indexOf(b.itemId));
+  const a = cleanText(base.custom);
+  const b = cleanText(extra.custom);
+  const custom = !b || a.includes(b) ? a : a ? `${a}, ${b}` : b;
+  return { drinks, snacks, custom };
+}
+
+/** Takes `extra` back out of `base` (used when un-picking a preset). */
+export function subtractSelection(base: Selection, extra: Selection, catalog: Catalog): Selection {
+  const drinks = base.drinks.map((d) => ({ ...d }));
+  for (const line of extra.drinks) {
+    const key = variantKeyOf(line, catalog);
+    const same = drinks.find((d) => variantKeyOf(d, catalog) === key);
+    if (same) same.qty -= line.qty;
+  }
+  const snacks = base.snacks.map((s) => ({ ...s }));
+  for (const line of extra.snacks) {
+    const same = snacks.find((s) => s.itemId === line.itemId);
+    if (same) same.qty -= line.qty;
+  }
+  const b = cleanText(extra.custom);
+  const custom = b
+    ? cleanText(base.custom.replace(b, ''))
+        .replace(/^,\s*|,\s*$/g, '')
+        .replace(/,\s*,/g, ',')
+    : base.custom;
+  return { drinks: drinks.filter((d) => d.qty > 0), snacks: snacks.filter((s) => s.qty > 0), custom };
 }

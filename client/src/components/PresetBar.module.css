@@ -7,10 +7,10 @@
 .head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
   flex-wrap: wrap;
-  min-height: 32px;
+  margin-bottom: 12px;
 }
 .head h2 {
   display: flex;
@@ -20,14 +20,9 @@
   font-size: 0.98rem;
   color: var(--accent);
 }
-.muted {
+.hint {
+  font-size: 0.8rem;
   color: var(--muted);
-  margin: 6px 0 0;
-  font-size: 0.9rem;
-}
-.changed {
-  color: var(--warning);
-  font-weight: 600;
 }
 .error {
   color: var(--danger);
@@ -36,10 +31,8 @@
   flex-basis: 100%;
 }
 .skeleton {
-  height: 34px;
-  width: 60%;
-  margin-top: 10px;
-  border-radius: 999px;
+  height: 72px;
+  border-radius: var(--r-lg);
   background: linear-gradient(90deg, var(--surface-2), var(--surface), var(--surface-2));
   background-size: 200% 100%;
   animation: shimmer 1.2s infinite;
@@ -49,65 +42,158 @@
     background-position: -200% 0;
   }
 }
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
 }
-.chips:not(:empty) {
-  margin-top: 10px;
-}
-.chip {
-  height: 36px;
-  padding: 0 16px;
-  border-radius: 999px;
-  border: 1px solid var(--border-strong);
+.card {
+  position: relative;
+  border-radius: var(--r-lg);
+  border: 1.5px solid var(--border);
   background: var(--surface);
-  font-weight: 500;
-  font-size: 0.9rem;
   box-shadow: var(--shadow-sm);
   transition:
-    background 0.15s,
     border-color 0.15s,
-    transform 0.1s var(--ease);
+    background 0.15s,
+    box-shadow 0.15s;
 }
-.chip:hover {
+.card:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.card[data-on] {
   border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
 }
-.chip:active {
-  transform: scale(0.97);
+.cardMain {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 12px 40px 12px 14px;
+  border: none;
+  background: none;
+  text-align: left;
+  border-radius: inherit;
 }
-.chip[aria-pressed='true'] {
+.cardMain:active {
+  transform: scale(0.985);
+}
+.cardTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cardName {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.check {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  color: var(--on-accent);
+  flex: none;
+}
+.card[data-on] .check {
   background: var(--accent);
   border-color: var(--accent);
-  color: var(--on-accent);
 }
-.activeRow {
+.contents {
+  display: grid;
+  gap: 1px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.contents span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.editButton {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+}
+.editButton:hover,
+.editButton[aria-expanded='true'] {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.addCard {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
+  min-height: 72px;
+  padding: 12px;
+  border-radius: var(--r-lg);
+  border: 1.5px dashed color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+.addCard:disabled {
+  color: var(--muted);
+  border-color: var(--border-strong);
+  cursor: default;
+}
+.addCard:not(:disabled):hover {
+  background: var(--surface);
+}
+.manage,
+.form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px dashed color-mix(in srgb, var(--accent) 25%, var(--border));
 }
-.activeRow .muted {
-  margin: 0;
-}
-.actions {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.form {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-  flex-wrap: wrap;
+.manageName {
+  font-weight: 700;
+  margin-right: auto;
 }
 .form input {
   flex: 1 1 200px;
   height: 40px;
   padding: 0 14px;
+}
+
+/* Phones: one row of cards you swipe sideways, instead of a tall stack */
+@media (max-width: 560px) {
+  .grid {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    margin: 0 -18px;
+    padding: 2px 18px 6px;
+    scrollbar-width: none;
+  }
+  .grid::-webkit-scrollbar {
+    display: none;
+  }
+  .card,
+  .addCard {
+    flex: 0 0 72%;
+    scroll-snap-align: start;
+  }
+  .hint {
+    display: none;
+  }
 }
